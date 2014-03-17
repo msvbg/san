@@ -1,8 +1,21 @@
 #include "san.h"
 
+void printError(san_error_t const *error) {
+  const char *file = "CLI";
+  if (error->file != NULL)
+    file = error->file;
+
+  printf(
+    "\e[1;37m[%s:%d:%d] "
+    "\e[1;31mERROR S%d:"
+    "\e[1;37m %s\n\e[0m",
+    file, error->line, error->column,
+    error->code, error->msg);
+}
+
 int main(int argc, const char **argv) {
   
-  while (SAN_TRUE) {
+  while (1) {
     printf("> "); 
 
     char line[1024];
@@ -17,9 +30,16 @@ int main(int argc, const char **argv) {
       break;
     }
 
-    token_t *tokens = NULL;
+    san_token_t *tokens = NULL;
+    san_error_list_t *errList = NULL;
     char *linePtr = line;
-    if (readTokens(linePtr, &tokens) == SAN_OK) {
+    if (readTokens(linePtr, &tokens, &errList) == SAN_OK) {
+      if (errList != NULL) {
+        for (int i = 0; i < errList->nErrors; ++i) {
+          printError(errList->errors + i);
+        }
+      }
+      
       for (int i = 0; tokens[i].type != SAN_TOKEN_END; ++i) {
         printf("%d: \"%s\"\n", tokens[i].type, tokens[i].raw);
       }

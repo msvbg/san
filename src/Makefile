@@ -8,7 +8,8 @@ SAN_CC=cc $(SAN_CFLAGS)
 objects=san-cli.o tokenizer.o
 
 san: $(objects)
-	$(SAN_CC) -o ../san $(objects)
+	mkdir -p ../build
+	$(SAN_CC) -o ../build/san $(objects)
 	rm -f *.o
 
 san-cli.o tokenizer.o: san.h

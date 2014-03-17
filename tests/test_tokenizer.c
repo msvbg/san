@@ -1,6 +1,39 @@
 #include "../src/tokenizer.c"
 #include <check.h>
 
+START_TEST (test_create_tokenizer_state) {
+  san_tokenizer_state_t *state;
+  createTokenizerState(&state);
+  ck_assert_int_eq(state->line, 1);
+  ck_assert_int_eq(state->column, 1);
+  ck_assert_int_eq(state->errorList->nErrors, 0);
+  ck_assert(state->errorList->errorCapacity > 0);
+} END_TEST
+
+START_TEST (test_advance) {
+  san_tokenizer_state_t *state;
+  createTokenizerState(&state);
+  state->inputPtr = "a\nb";
+
+  ck_assert_int_eq(state->line, 1);
+  ck_assert_int_eq(state->column, 1);
+
+  advance(state);
+
+  ck_assert_int_eq(state->line, 1);
+  ck_assert_int_eq(state->column, 2);
+
+  advance(state);
+
+  ck_assert_int_eq(state->line, 2);
+  ck_assert_int_eq(state->column, 1);
+
+  advance(state);
+
+  ck_assert_int_eq(state->line, 2);
+  ck_assert_int_eq(state->column, 2);
+} END_TEST
+
 START_TEST (test_is_alphabetic) {
   ck_assert_int_eq(isAlphabetic('q'), 1);
   ck_assert_int_eq(isAlphabetic('Z'), 1);
@@ -18,14 +51,19 @@ START_TEST (test_is_keyword) {
   ck_assert_int_eq(isKeyword("foobar"), 0);
 } END_TEST
 
+START_TEST (test_is_digit) {
+  ck_assert_int_eq(isDigit('5'), 1);
+} END_TEST
+
 START_TEST (test_classify_token) {
   ck_assert_int_eq(classifyToken("Abc"), SAN_TOKEN_IDENTIFIER_OR_KEYWORD);
   ck_assert_int_eq(classifyToken(" \t"), SAN_TOKEN_WHITE_SPACE);
+  ck_assert_int_eq(classifyToken("459"), SAN_TOKEN_NUMBER);
 } END_TEST
 
 START_TEST (test_accept_char) {
   int i;
-  token_t *token;
+  san_token_t *token;
   createToken(&token);
   
   acceptChar('k', token);
@@ -41,7 +79,7 @@ START_TEST (test_accept_char) {
 } END_TEST
 
 START_TEST (test_append_token) {
-  token_t *tokens;
+  san_token_t *tokens;
   unsigned int nTokens = 0, tokenCapacity = 2;
   createTokens(&tokens, tokenCapacity);
   
@@ -62,36 +100,51 @@ START_TEST (test_append_token) {
 } END_TEST
 
 START_TEST (test_read_identifier_or_keyword) {
-  const char *ptr = "foo";
-  token_t *out;
+  const char *in = "foo";
+  san_tokenizer_state_t *state;
+  san_token_t *out;
 
   createToken(&out);
-  ck_assert_int_eq(readIdentifierOrKeyword(&ptr, out), SAN_OK);
+  createTokenizerState(&state);
+  state->inputPtr = in;
+  state->outputPtr = out;
+
+  ck_assert_int_eq(readIdentifierOrKeyword(state), SAN_OK);
   ck_assert_int_eq(out->type, SAN_TOKEN_IDENTIFIER);
-  destroyTokens(out, 1);
+  destroyToken(out);
 
-  ptr = "if";
+  in = "if";
   createToken(&out);
-  ck_assert_int_eq(readIdentifierOrKeyword(&ptr, out), SAN_OK);
+  state->inputPtr = in;
+  state->outputPtr = out;
+
+  ck_assert_int_eq(readIdentifierOrKeyword(state), SAN_OK);
   ck_assert_int_eq(out->type, SAN_TOKEN_KEYWORD);
-  destroyTokens(out, 1);
+  destroyToken(out);
 
 } END_TEST
 
 START_TEST (test_read_white_space) {
   const char *input = "  \t\n";
-  const char *inPtr = input;
-  token_t *token;
+  san_tokenizer_state_t *state;
+  san_token_t *token;
+
+  createTokenizerState(&state);
   createToken(&token);
+
+  state->inputPtr = input;
+  state->outputPtr = token;
   
-  readWhiteSpace(&inPtr, token);
+  readWhiteSpace(state);
   ck_assert_str_eq(token->raw, input);
 
-  destroyTokens(token, 1);
+  destroyTokenizerState(state);
+  destroyToken(token);
+
 } END_TEST
 
 START_TEST (test_create_token) {
-  token_t *token;
+  san_token_t *token;
   ck_assert_int_eq(createToken(&token), SAN_OK);
   ck_assert_int_eq(token->type, SAN_NO_TOKEN);
   ck_assert(token->rawSize > 0);
@@ -101,7 +154,7 @@ START_TEST (test_create_token) {
 
 START_TEST (test_create_tokens) {
   int i;
-  token_t *tokens;
+  san_token_t *tokens;
   ck_assert_int_eq(createTokens(&tokens, 1024), SAN_OK);
 
   for (i = 0; i < 1024; ++i) {
@@ -116,9 +169,12 @@ Suite* tokenizer_suite(void) {
   Suite *s = suite_create("Tokenizer");
 
   TCase *tc_core = tcase_create("Core");
+  tcase_add_test(tc_core, test_create_tokenizer_state);
+  tcase_add_test(tc_core, test_advance);
   tcase_add_test(tc_core, test_is_alphabetic);
   tcase_add_test(tc_core, test_is_alphanumeric);
   tcase_add_test(tc_core, test_is_keyword);
+  tcase_add_test(tc_core, test_is_digit);
   tcase_add_test(tc_core, test_classify_token);
   tcase_add_test(tc_core, test_read_identifier_or_keyword);
   tcase_add_test(tc_core, test_read_white_space);
