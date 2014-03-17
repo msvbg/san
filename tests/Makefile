@@ -3,7 +3,7 @@ WARN=-Wall -Werror
 TEST_LDFLAGS=-L/usr/local/Cellar/check/0.9.10/lib -lcheck
 CC=cc $(STD) $(WARN)
 
-objects=test_tokenizer.o
+objects=test_main.o
 
 default: $(objects)
 	$(CC) $(TEST_LDFLAGS) -o test $(objects)

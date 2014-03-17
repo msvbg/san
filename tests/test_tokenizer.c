@@ -1,5 +1,5 @@
-#include "../src/tokenizer.c"
 #include <check.h>
+#include "../src/tokenizer.c"
 
 START_TEST (test_create_tokenizer_state) {
   san_tokenizer_state_t *state;
@@ -59,6 +59,7 @@ START_TEST (test_classify_token) {
   ck_assert_int_eq(classifyToken("Abc"), SAN_TOKEN_IDENTIFIER_OR_KEYWORD);
   ck_assert_int_eq(classifyToken(" \t"), SAN_TOKEN_WHITE_SPACE);
   ck_assert_int_eq(classifyToken("459"), SAN_TOKEN_NUMBER);
+  ck_assert_int_eq(classifyToken("="), SAN_TOKEN_EQUALS);
 } END_TEST
 
 START_TEST (test_accept_char) {
@@ -165,6 +166,27 @@ START_TEST (test_create_tokens) {
   destroyTokens(tokens, 1024);
 } END_TEST
 
+START_TEST (test_read_tokens) {
+  san_token_t *tokens;
+  san_error_list_t *errList;
+
+  readTokens("foo bar", &tokens, &errList);
+  ck_assert_int_eq(tokens[0].type, SAN_TOKEN_IDENTIFIER);
+  ck_assert_int_eq(tokens[1].type, SAN_TOKEN_WHITE_SPACE);
+  ck_assert_int_eq(tokens[2].type, SAN_TOKEN_IDENTIFIER);
+  ck_assert_int_eq(tokens[3].type, SAN_TOKEN_END);
+  ck_assert(errList == NULL);
+  
+  /* TODO: destroy tokens */
+  /* TODO: destroy error list */
+
+  readTokens("foo=9", &tokens, &errList);
+  ck_assert_int_eq(tokens[1].type, SAN_TOKEN_EQUALS);
+  ck_assert(errList == NULL);
+
+
+} END_TEST
+
 Suite* tokenizer_suite(void) {
   Suite *s = suite_create("Tokenizer");
 
@@ -182,18 +204,8 @@ Suite* tokenizer_suite(void) {
   tcase_add_test(tc_core, test_append_token);
   tcase_add_test(tc_core, test_create_token);
   tcase_add_test(tc_core, test_create_tokens);
+  tcase_add_test(tc_core, test_read_tokens);
   suite_add_tcase(s, tc_core);
 
   return s;
-}
-
-int main(void) {
-  int num_failed;
-  Suite *s = tokenizer_suite();
-  SRunner *sr = srunner_create(s);
-  srunner_run_all(sr, CK_NORMAL);
-  num_failed = srunner_ntests_failed(sr);
-  srunner_free(sr);
-
-  return num_failed == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

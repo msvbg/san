@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * Errors
+ */
 typedef struct {
   int code; 
   char msg[200];
@@ -56,7 +59,17 @@ typedef struct {
 #define SAN_TOKEN_KEYWORD                 5
 #define SAN_TOKEN_WHITE_SPACE             6
 #define SAN_TOKEN_NUMBER                  7
+#define SAN_TOKEN_EQUALS                  8
 
 int readTokens(const char *input, san_token_t **tokens, san_error_list_t **errors);
+
+/*
+ * Parser
+ */
+typedef struct {
+  struct san_ast_t *root;
+} san_ast_t;
+
+int parseTokens(san_token_t const* tokens, san_ast_t **ast);
 
 #endif

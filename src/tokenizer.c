@@ -87,6 +87,7 @@ int classifyToken(const char *input) {
   if (isAlphabetic(firstChar)) return SAN_TOKEN_IDENTIFIER_OR_KEYWORD;
   if (isWhiteSpace(firstChar)) return SAN_TOKEN_WHITE_SPACE;
   if (isDigit(firstChar)) return SAN_TOKEN_NUMBER;
+  if (firstChar == '=') return SAN_TOKEN_EQUALS;
   return SAN_INVALID_TOKEN; 
 }
 
@@ -96,6 +97,9 @@ int classifyToken(const char *input) {
 int resetToken(san_token_t *token) {
   token->type = SAN_NO_TOKEN;
 
+  if (token->raw != NULL)
+    free(token->raw);
+  
   token->raw = malloc(sizeof(char) * 32);
   token->rawSize = 32;
   if (token->raw == NULL) return SAN_FAIL;
@@ -104,7 +108,7 @@ int resetToken(san_token_t *token) {
 
 int createTokens(san_token_t **out, unsigned int n) {
   int i;
-  san_token_t *tokens = malloc(n * sizeof(san_token_t));
+  san_token_t *tokens = calloc(n, sizeof(san_token_t));
 
   if (tokens == NULL) return SAN_FAIL;
 
@@ -153,7 +157,10 @@ int appendToken(san_token_t **tokens, unsigned int *nTokens, unsigned int *token
   int i;
 
   if (*nTokens + 1 > *tokenCapacity) {
-    *tokens = realloc(*tokens, sizeof(san_token_t) * *tokenCapacity * 2);
+    san_token_t *newTokens = calloc(*tokenCapacity * 2, sizeof(san_token_t));
+    memcpy(newTokens, tokens, *tokenCapacity);
+    *tokens = newTokens;
+
     for (i = *tokenCapacity; i < *tokenCapacity * 2; ++i) {
       if (resetToken((*tokens) + i) == SAN_FAIL) return SAN_FAIL;
     }
@@ -231,23 +238,28 @@ int readTokens(const char *input, san_token_t **output, san_error_list_t **error
       case SAN_TOKEN_NUMBER:
         readNumber(state);
         break;
+      case SAN_TOKEN_EQUALS:
+        acceptChar(*state->inputPtr, state->outputPtr);
+        advance(state);
+        break;
 
       case SAN_INVALID_TOKEN:
         tokenError(state, SAN_ERROR_INVALID_CHARACTER, *state->inputPtr);
+        resetToken(state->outputPtr);
         advance(state);
         continue;
     }
 
     if (appendToken(output, &nTokens, &tokenCapacity) == SAN_FAIL) {
       tokenError(state, SAN_ERROR_INTERNAL, NULL);
-      return SAN_FAIL;
+      break;
     }
     state->outputPtr = *output + nTokens;
   }
   
   state->outputPtr->type = SAN_TOKEN_END;
   if (state->errorList->nErrors > 0) *errors = state->errorList;
-  else errors = NULL;
+  else *errors = NULL;
 
   destroyTokenizerState(state);
 
