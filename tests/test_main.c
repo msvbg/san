@@ -1,6 +1,9 @@
+#include <stdlib.h>
 #include <check.h>
-#include "test_tokenizer.c"
-#include "test_parser.c"
+
+Suite *(tokenizer_suite)(void),
+      *(parser_suite)(void),
+      *(vector_suite)(void);
 
 void runSuite(Suite* (*suiteFn)(void), int *numFailed) {
   Suite *s = suiteFn();
@@ -15,6 +18,7 @@ int main(void) {
   Suite* (*suites[])(void) = {
     &tokenizer_suite,
     &parser_suite,
+    &vector_suite,
     0
   };
 
