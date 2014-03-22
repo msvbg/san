@@ -8,15 +8,15 @@ START_TEST (test_empty_input) {
 } END_TEST
 
 START_TEST (test_addition) {
-  san_vector_t *tokens;
-  san_vector_t *errorList;
-  //san_ast_t *ast;
+  san_vector_t tokens;
+  san_vector_t errorList;
+  san_ast_t *ast;
   
   sanv_create(&errorList, sizeof(san_error_t));
   sanv_create(&tokens, sizeof(san_token_t));
 
-  sant_tokenize("4+5", tokens, errorList);
-  //parseTokens(tokens, &ast);
+  sant_tokenize("4+5", &tokens, &errorList);
+  parseTokens(&tokens, &ast);
   
 } END_TEST
 

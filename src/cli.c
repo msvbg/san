@@ -33,14 +33,14 @@ int main(int argc, const char **argv) {
       break;
     }
 
-    san_vector_t *tokens = NULL;
+    san_vector_t tokens;
     sanv_create(&tokens, sizeof(san_token_t));
 
-    san_vector_t *errList = NULL;
+    san_vector_t errList;
     sanv_create(&errList, sizeof(san_error_t));
 
-    if (sant_tokenize(line, tokens, errList) == SAN_OK) {
-      if (errList->size != 0) {
+    if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {
+      if (errList.size != 0) {
         SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
           printError(error);
         SAN_VECTOR_END_FOR_EACH

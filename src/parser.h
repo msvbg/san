@@ -2,6 +2,7 @@
 #define __SAN_PARSER_H
 
 #include "tokenizer.h"
+#include "vector.h"
 
 /*
  * Parser
@@ -16,14 +17,13 @@
 typedef struct {
   int type;
   san_token_t const *token;
-  struct san_ast_node_t **children;
-  int childrenSize, childrenCapacity;
+  san_vector_t children;
 } san_ast_node_t;
 
 typedef struct {
   san_ast_node_t *root;
 } san_ast_t;
 
-int parseTokens(san_token_t const* tokens, san_ast_t **ast);
+int parseTokens(san_vector_t const* tokens, san_ast_t **ast);
 
 #endif

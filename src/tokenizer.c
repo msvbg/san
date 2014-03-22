@@ -244,6 +244,10 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
     }
   }
 
+  san_token_t endToken;
+  endToken.type = SAN_TOKEN_END;
+  sanv_push(state->output, &endToken);
+
   destroy_state(state);
 
   return SAN_OK;

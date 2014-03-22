@@ -2,69 +2,52 @@
 #include "parser.h"
 
 typedef struct {
+  san_vector_t const *tokens;
   san_token_t const *tokenPtr;
+  san_vector_t nodeStack;
+} parser_state_t;
 
-  san_ast_node_t *nodeStack;
-  int nodeStackSize, nodeStackCapacity;
-} san_parser_state_t;
-
-typedef int (*parser_t)(san_parser_state_t *state);
+typedef int (*parser_t)(parser_state_t *state);
 
 #define SAN_MATCH       1
 #define SAN_NO_MATCH    2
 
-int parseExpression(san_parser_state_t *state);
-int parseTerm(san_parser_state_t *state);
+int parseExpression(parser_state_t *state);
+int parseTerm(parser_state_t *state);
 
 /*
  * Parser helper functions
  */
-int headIs(san_parser_state_t const *state, int tokenType) {
+static inline int head_is(parser_state_t const *state, int tokenType) {
   return state->tokenPtr->type == tokenType;
 }
 
-int headIsNot(san_parser_state_t const *state, int tokenType) {
-  return state->tokenPtr->type != tokenType;
+static inline int head_is_not(parser_state_t const *state, int tokenType) {
+  return !head_is(state, tokenType);
 }
 
-san_parser_state_t cloneState(san_parser_state_t *state) {
-  return *state;
-}
-
-san_parser_state_t advanceState(san_parser_state_t *state) {
-  san_parser_state_t newState = *state;
+static inline parser_state_t advance_state(parser_state_t *state) {
+  parser_state_t newState = *state;
   newState.tokenPtr = state->tokenPtr + 1;
   return newState;
 }
 
-void pushNode(san_parser_state_t *state, int type) {
-  san_ast_node_t *topNode;
-
-  /* Resize node stack if necessary */
-  if (state->nodeStackSize + 1 > state->nodeStackCapacity) {
-    san_ast_node_t *nodes = calloc(state->nodeStackCapacity * 2, sizeof(san_ast_node_t));
-    memcpy(nodes, state->nodeStack, state->nodeStackSize);
-    free(state->nodeStack);
-    state->nodeStack = nodes;
-  }
-
-  topNode = state->nodeStack + state->nodeStackSize;
-  topNode = malloc(sizeof(san_ast_node_t));
-  topNode->type = type;
-  topNode->token = state->tokenPtr;
-  topNode->childrenSize = 0;
-  topNode->childrenCapacity = 2;
-  topNode->children = calloc(2, sizeof(san_ast_node_t*));
+void pushNode(parser_state_t *state, int type) {
+  san_ast_node_t node;
+  node.type = type;
+  node.token = state->tokenPtr;
+  sanv_create(&node.children, sizeof(san_ast_node_t*));
+  sanv_push(&state->nodeStack, &node);
 }
 
-int kleene(san_parser_state_t *state, parser_t parser) {
+int kleene(parser_state_t *state, parser_t parser) {
   int match = SAN_NO_MATCH;
-  while (headIsNot(state, SAN_TOKEN_END) &&
+  while (head_is_not(state, SAN_TOKEN_END) &&
     parser(state) == SAN_MATCH) { match = SAN_MATCH; }
   return match;
 }
 
-int or(san_parser_state_t *state, parser_t first, parser_t second) {
+int or(parser_state_t *state, parser_t first, parser_t second) {
   return first(state) == SAN_MATCH ? SAN_MATCH :
          second(state) == SAN_MATCH ? SAN_MATCH : SAN_NO_MATCH;
 }
@@ -72,44 +55,50 @@ int or(san_parser_state_t *state, parser_t first, parser_t second) {
 /*
  * Parser functions
  */
-int parseFactor(san_parser_state_t *state) {
-  while (headIsNot(state, SAN_TOKEN_END)) {
-    if (headIs(state, SAN_TOKEN_IDENTIFIER)) {
-      return SAN_OK;
-    } else if (headIs(state, SAN_TOKEN_NUMBER)) {
-      return SAN_OK;
-    }
+int parseFactor(parser_state_t *state) {
+  printf("Parsing factor\n");
+        fflush(stdout);
+  if (head_is(state, SAN_TOKEN_IDENTIFIER)) {
+    return SAN_MATCH;
+  } else if (head_is(state, SAN_TOKEN_NUMBER)) {
+    return SAN_MATCH;
   }
-  return SAN_OK;
+  return SAN_NO_MATCH;
 }
 
-int parsePlus(san_parser_state_t *state) {
-  return headIs(state, SAN_TOKEN_PLUS);
+int parsePlus(parser_state_t *state) {
+  printf("Parsing plus: %d\n", head_is(state, SAN_TOKEN_PLUS));
+        fflush(stdout);
+  return head_is(state, SAN_TOKEN_PLUS) ? SAN_MATCH : SAN_NO_MATCH;
 }
 
-int parseTimes(san_parser_state_t *state) {
-  return headIs(state, SAN_TOKEN_TIMES);
+int parseTimes(parser_state_t *state) {
+  printf("Parsing times\n");
+        fflush(stdout);
+  return head_is(state, SAN_TOKEN_TIMES) ? SAN_MATCH : SAN_NO_MATCH;
 }
 
-int parseTerm(san_parser_state_t *state) {
-  san_parser_state_t nextState = *state;
+int parseTerm(parser_state_t *state) {
+  printf("Parsing term\n");
+        fflush(stdout);
 
-  if (parseFactor(&nextState) == SAN_MATCH) {
-    nextState = advanceState(&nextState);
+  if (parseFactor(state) == SAN_MATCH) {
     pushNode(state, SAN_PARSER_FACTOR);
+    parser_state_t s1 = advance_state(state);
 
-    if (parseTimes(&nextState) == SAN_MATCH) {
-      nextState = advanceState(&nextState);
-      pushNode(state, SAN_PARSER_MULTIPLICATION_EXPRESSION);
+    if (parseTimes(&s1) == SAN_MATCH) {
+      pushNode(&s1, SAN_PARSER_MULTIPLICATION_EXPRESSION);
+      parser_state_t s2 = advance_state(&s1);
       
-      if (parseExpression(&nextState) == SAN_MATCH) {
-        pushNode(state, SAN_PARSER_EXPRESSION);
+      if (parseExpression(&s2) == SAN_MATCH) {
+        pushNode(&s2, SAN_PARSER_EXPRESSION);
 
-        *state = advanceState(&nextState);
+        *state = s2;
         return SAN_MATCH;
+      } else {
+        // Expected expression
       }
     } else {
-      *state = advanceState(&nextState);
       return SAN_MATCH;
     }
   } else {
@@ -120,25 +109,27 @@ int parseTerm(san_parser_state_t *state) {
   return SAN_FAIL;
 }
 
-int parseExpression(san_parser_state_t *state) {
-  san_parser_state_t nextState = cloneState(state);
-
-  if (parseTerm(&nextState) == SAN_MATCH) {
-    nextState = advanceState(&nextState);
-    pushNode(state, SAN_PARSER_TERM);
-
-    if (parsePlus(&nextState) == SAN_MATCH) {
-      nextState = advanceState(&nextState);
-      pushNode(state, SAN_PARSER_ADDITION_EXPRESSION);
-
-      if (parseExpression(&nextState) == SAN_MATCH) {
-        pushNode(state, SAN_PARSER_EXPRESSION);
+int parseExpression(parser_state_t *state) {
+  printf("Parsing expression\n");
+        //printf("%d\n", state->nodeStack.size);
+        fflush(stdout);
         
-        *state = advanceState(&nextState);
+  if (parseTerm(state) == SAN_MATCH) {
+    pushNode(state, SAN_PARSER_TERM);
+    parser_state_t s1 = advance_state(state);
+
+    if (parsePlus(&s1) == SAN_MATCH) {
+      pushNode(&s1, SAN_PARSER_ADDITION_EXPRESSION);
+      parser_state_t s2 = advance_state(&s1);
+
+      if (parseExpression(&s2) == SAN_MATCH) {
+        pushNode(&s2, SAN_PARSER_EXPRESSION);
+        printf("KLK\n");
+
+        *state = s2;
         return SAN_MATCH;
       }
     } else {
-      *state = advanceState(&nextState);
       return SAN_MATCH;
     }
   } else {
@@ -149,25 +140,23 @@ int parseExpression(san_parser_state_t *state) {
   return SAN_FAIL;
 }
 
-int parseTokens(san_token_t const *tokens, san_ast_t **ast) {
-  san_parser_state_t *state;
+int parseTokens(san_vector_t const *tokens, san_ast_t **ast) {
+  parser_state_t state;
 
-  if (tokens == NULL) {
+  if (tokens == NULL || tokens->size == 0) {
     *ast = NULL;
     return SAN_OK;
   }
 
-  state = malloc(sizeof(san_parser_state_t));
-  if (state == NULL) return SAN_FAIL;
+  state.tokens = tokens;
+  state.tokenPtr = tokens->elems;
+  sanv_create(&state.nodeStack, sizeof(san_ast_node_t));
 
-  state->tokenPtr = tokens;
-  state->nodeStackCapacity = 10;
-  state->nodeStackSize = 0;
-  state->nodeStack = malloc(sizeof(san_ast_node_t) * state->nodeStackCapacity);
+  parseExpression(&state);
 
-  parseExpression(state);
-
-  /* free nodeStack */
+  SAN_VECTOR_FOR_EACH(state.nodeStack, i, san_ast_node_t, node)
+    printf("%d: %d\n", i, node->type);
+  SAN_VECTOR_END_FOR_EACH
 
   return SAN_OK;
 }
