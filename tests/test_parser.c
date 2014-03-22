@@ -15,7 +15,7 @@ START_TEST (test_addition) {
   sanv_create(&errorList, sizeof(san_error_t));
   sanv_create(&tokens, sizeof(san_token_t));
 
-  //sant_tokenize("4+5", tokens, errorList);
+  sant_tokenize("4+5", tokens, errorList);
   //parseTokens(tokens, &ast);
   
 } END_TEST

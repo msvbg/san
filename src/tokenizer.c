@@ -8,25 +8,14 @@ typedef struct {
   san_vector_t *errorList;
 } tokenizer_state_t;
 
-/*
- * Only intended to be used from within the tokenError macro.
- */
-san_error_t *__addTokenError(tokenizer_state_t *state, int code) {
-  san_error_t *err;
-  sane_create(&err);
-  
-  err->code = code;
-  err->line = state->line;
-  err->column = state->column;
-
-  sanv_push(state->errorList, err);
-  
-  return err;
-}
-
-#define tokenError(state, code, ...) do { \
-  san_error_t *err = __addTokenError(state, code); \
-  sprintf(err->msg, code##_MSG, __VA_ARGS__); \
+#define tokenError(__state, __code, ...) do { \
+  san_error_t err; \
+  memset(&err, 0, sizeof err); \
+  err.code = __code; \
+  err.line = __state->line; \
+  err.column = __state->column; \
+  sprintf(err.msg, __code##_MSG, __VA_ARGS__); \
+  sanv_push(__state->errorList, &err); \
 } while (0)
 
 /*
@@ -240,11 +229,13 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
         break;
 
       case SAN_TOKEN_TIMES:
+      case SAN_TOKEN_PLUS:
       case SAN_TOKEN_EQUALS:
         acceptChar(state);
         advance(state);
         break;
 
+      default:
       case SAN_INVALID_TOKEN:
         tokenError(state, SAN_ERROR_INVALID_CHARACTER, *state->inputPtr);
         resetToken(thisToken);
