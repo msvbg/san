@@ -136,25 +136,28 @@ int parse_additive_exp(parser_state_t *state) {
     add_child(state, nodeIndex);
     parser_state_t s1 = advance_state(state);
 
-    if (match_terminal(&s1, SAN_TOKEN_PLUS) == SAN_MATCH) {
-      parser_state_t s2 = advance_state(&s1);
+    int success = SAN_NO_MATCH;
+    parser_state_t s2 = s1;
+    while (match_terminal(&s2, SAN_TOKEN_PLUS) == SAN_MATCH) {
+      ++s2.tokenPtr;
       
       if (parse_mult_exp(&s2) == SAN_MATCH) {
+        add_child(&s2, nodeIndex);
         *state = s2;
-        add_child(state, nodeIndex);
-        return SAN_MATCH;
+        success = SAN_MATCH;
+        ++s2.tokenPtr;
       } else {
-        // Expected expression
+        //error
       }
-    } else {
-      return SAN_MATCH;
     }
+    return success;
+
   } else {
     return SAN_NO_MATCH;
   }
 
   /* This should never happen */
-  return SAN_FAIL;
+  return SAN_NO_MATCH;
 }
 
 int parse_exp(parser_state_t *state) {
@@ -177,7 +180,7 @@ void dump_ast(san_node_t *ast, int ind) {
   indent(ind);
   int type = ast != NULL ? ast->type : -1;
   //char * raw = ast != NULL && ast->token != NULL && ast->token->type != SAN_TOKEN_END ? ast->token->raw : "";
-  printf("[node type: %s, ptr: '', nchildren: %d]\n", fmt(type), ast->children.size);
+  printf("[node type: %s, ptr: '%s', nchildren: %d]\n", fmt(type), ast->token->raw, ast->children.size);
   fflush(stdout);
   SAN_VECTOR_FOR_EACH(ast->children, i, san_node_t, node)
     dump_ast(node, ind+2);
