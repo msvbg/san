@@ -2,16 +2,16 @@
 #include "../src/parser.h"
 
 START_TEST (test_empty_input) {
-  san_ast_t *ast;
-  parseTokens(NULL, &ast);
-  ck_assert(ast == NULL);
+  san_node_t ast;
+  ck_assert_int_eq(parseTokens(NULL, &ast), SAN_FAIL);
 } END_TEST
 
 START_TEST (test_addition) {
   san_vector_t tokens;
   san_vector_t errorList;
-  san_ast_t *ast;
+  san_node_t ast;
   
+  sanv_create(&ast.children, sizeof(san_node_t));
   sanv_create(&errorList, sizeof(san_error_t));
   sanv_create(&tokens, sizeof(san_token_t));
 

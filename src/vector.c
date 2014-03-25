@@ -3,7 +3,7 @@
                                                                 
 int sanv_create(san_vector_t *vector, size_t elementSize) {
   memset(vector, 0, sizeof(san_vector_t));
-  vector->capacity = 2;  
+  vector->capacity = 2;
   vector->elementSize = elementSize;
   vector->size = 0; 
   vector->elems = calloc(vector->capacity, elementSize); 
