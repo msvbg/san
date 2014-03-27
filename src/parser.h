@@ -14,6 +14,9 @@
 #define SAN_PARSER_NUMBER_LITERAL             4
 #define SAN_PARSER_ADDITIVE_EXPRESSION        5
 #define SAN_PARSER_MULTIPLICATIVE_EXPRESSION  6
+#define SAN_PARSER_STATEMENT                  7
+#define SAN_PARSER_VARIABLE_DEFINITION        8
+#define SAN_PARSER_LVALUE                     9
 
 typedef struct {
   int type;
@@ -21,6 +24,6 @@ typedef struct {
   san_vector_t children;
 } san_node_t;
 
-int parseTokens(san_vector_t const* tokens, san_node_t *ast);
+int parse(san_vector_t const* tokens, san_node_t *ast);
 
 #endif

@@ -2,6 +2,7 @@
 #include "vector.h"
 #include "errors.h"
 #include "tokenizer.h"
+#include "parser.h"
 
 void printError(san_error_t const *error) {
   const char *file = "CLI";
@@ -16,17 +17,40 @@ void printError(san_error_t const *error) {
     error->code, error->msg);
 }
 
+int eval(san_node_t *node) {
+  int total;
+
+  if (node->type == SAN_PARSER_ADDITIVE_EXPRESSION) {
+    total = 0;
+    SAN_VECTOR_FOR_EACH(node->children, i, san_node_t, n)
+      total += eval(n);
+    SAN_VECTOR_END_FOR_EACH
+    return total;
+  } else if (node->type == SAN_PARSER_MULTIPLICATIVE_EXPRESSION) {
+    total = 1;
+    SAN_VECTOR_FOR_EACH(node->children, i, san_node_t, n)
+      total *= eval(n);
+    SAN_VECTOR_END_FOR_EACH
+    return total;
+  } else if(node->type == SAN_PARSER_NUMBER_LITERAL) {
+    return atoi(node->token->raw);
+  } else if(node->children.size == 1) {
+    return eval(sanv_nth(&node->children, 0));
+  }
+  return -1;
+}
+
 int main(int argc, const char **argv) {
-  
+
   while (1) {
-    printf("> "); 
+    printf("> ");
 
     char line[1024];
     fgets(line, 1024, stdin);
 
     /* Replace newline at end with \0 */
     if (line[strlen(line) -1] == '\n') {
-      line[strlen(line) - 1] = '\0'; 
+      line[strlen(line) - 1] = '\0';
     }
 
     if (strcmp(line, "quit") == 0) {
@@ -45,12 +69,11 @@ int main(int argc, const char **argv) {
           printError(error);
         SAN_VECTOR_END_FOR_EACH
       }
-      
-      SAN_VECTOR_FOR_EACH(tokens, i, san_token_t, token)
-        printf("%d: \"%s\"\n", token->type, token->raw);
-      SAN_VECTOR_END_FOR_EACH
     }
 
+    san_node_t root;
+    parse(&tokens, &root);
+    printf("RESULT: %d\n", eval(&root));
     //sanv_destroy(tokens, &sant_destructor);
     //sanv_destroy(errList, &sane_destructor);
   }
