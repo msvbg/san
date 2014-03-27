@@ -17,6 +17,9 @@
 #define SAN_PARSER_STATEMENT                  7
 #define SAN_PARSER_VARIABLE_DEFINITION        8
 #define SAN_PARSER_LVALUE                     9
+#define SAN_PARSER_FUNCTION_PARAMETER_LIST    10
+#define SAN_PARSER_FUNCTION_PARAMETER         11
+#define SAN_PARSER_PRIMARY_EXPRESSION         12
 
 typedef struct {
   int type;

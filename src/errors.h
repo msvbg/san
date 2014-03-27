@@ -31,6 +31,10 @@ typedef struct {
 #define SAN_ERROR_EXPECTED_TERM_MSG \
   "Expected a term in additive expression at '%s'"
 
+#define SAN_ERROR_EXPECTED_TOKEN               1005
+#define SAN_ERROR_EXPECTED_TOKEN_MSG \
+  "Expected token '%s' after expression '%s'"
+
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
 

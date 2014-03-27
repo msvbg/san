@@ -3,7 +3,9 @@
 
 START_TEST (test_empty_input) {
   san_node_t ast;
-  ck_assert_int_eq(parse(NULL, &ast), SAN_FAIL);
+  san_vector_t errors;
+  sanv_create(&errors, sizeof(san_error_t));
+  ck_assert_int_eq(parse(NULL, &ast, &errors), SAN_FAIL);
 } END_TEST
 
 START_TEST (test_addition) {
@@ -16,7 +18,7 @@ START_TEST (test_addition) {
   sanv_create(&tokens, sizeof(san_token_t));
 
   sant_tokenize("1+2+3*w+4+5+6+7+8+9", &tokens, &errorList);
-  parse(&tokens, &ast);
+  parse(&tokens, &ast, &errorList);
 
 } END_TEST
 
