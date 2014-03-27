@@ -5,7 +5,7 @@
  * Errors
  */
 typedef struct {
-  int code; 
+  int code;
   char msg[200];
   int line, column;
   const char *file;
@@ -22,6 +22,14 @@ typedef struct {
 #define SAN_ERROR_INVALID_CHARACTER            1002
 #define SAN_ERROR_INVALID_CHARACTER_MSG \
   "Encountered an invalid characteter ('%c')"
+
+#define SAN_ERROR_EXPECTED_EXPRESSION          1003
+#define SAN_ERROR_EXPECTED_EXPRESSION_MSG \
+  "Expected an expression after '%s'"
+
+#define SAN_ERROR_EXPECTED_TERM                1004
+#define SAN_ERROR_EXPECTED_TERM_MSG \
+  "Expected a term in additive expression at '%s'"
 
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);

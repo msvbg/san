@@ -9,6 +9,8 @@ typedef struct {
   int type;
   char *raw;
   size_t rawSize;
+
+  int line, column;
 } san_token_t;
 
 #define SAN_NO_TOKEN                      0

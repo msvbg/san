@@ -78,7 +78,7 @@ int classifyToken(const char *input) {
   if (firstChar == '=') return SAN_TOKEN_EQUALS;
   if (firstChar == '*') return SAN_TOKEN_TIMES;
   if (firstChar == '+') return SAN_TOKEN_PLUS;
-  return SAN_INVALID_TOKEN; 
+  return SAN_INVALID_TOKEN;
 }
 
 /*
@@ -89,7 +89,7 @@ int resetToken(san_token_t *token) {
 
   if (token->raw != NULL)
     free(token->raw);
-  
+
   token->raw = malloc(sizeof(char) * 32);
   token->rawSize = 32;
   if (token->raw == NULL) return SAN_FAIL;
@@ -138,12 +138,12 @@ int sant_destructor(void *ptr) {
 }
 
 int acceptChar(tokenizer_state_t *state) {
-  san_token_t *token = (san_token_t*)sanv_back(state->output); 
+  san_token_t *token = (san_token_t*)sanv_back(state->output);
   int len = token->raw == NULL ? (unsigned)(-1) : strlen(token->raw);
-  
+
   /* Size of old raw block is too small, so double it */
   if (len + 1 >= token->rawSize) {
-    token->raw = realloc(token->raw, token->rawSize * 2); 
+    token->raw = realloc(token->raw, token->rawSize * 2);
     token->rawSize = token->rawSize * 2;
     if (token->raw == NULL) return SAN_FAIL;
   }
@@ -200,7 +200,7 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
   tokenizer_state_t *state;
 
   if (input == NULL || input[0] == '\0') return SAN_FAIL;
-  
+
   create_state(&state, errors);
 
   state->output = output;
@@ -209,6 +209,8 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
   while (*state->inputPtr != '\0') {
     san_token_t *thisToken;
     san_token_t newToken;
+    newToken.line = state->line;
+    newToken.column = state->column;
     memset(&newToken, 0, sizeof(san_token_t));
     sanv_push(state->output, &newToken);
 

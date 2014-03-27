@@ -72,7 +72,13 @@ int main(int argc, const char **argv) {
     }
 
     san_node_t root;
-    parse(&tokens, &root);
+    parse(&tokens, &root, &errList);
+    if (errList.size != 0) {
+      SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
+        printError(error);
+      SAN_VECTOR_END_FOR_EACH
+    }
+    printf("ERRORS: %d\n", errList.size);
     printf("RESULT: %d\n", eval(&root));
     //sanv_destroy(tokens, &sant_destructor);
     //sanv_destroy(errList, &sane_destructor);
