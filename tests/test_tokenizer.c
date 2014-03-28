@@ -1,41 +1,53 @@
 #include <check.h>
 #include "../src/tokenizer.h"
 
+#define nth(n) ((san_token_t*)sanv_nth(&tokens, n))
+#define asrti(a, b) ck_assert_int_eq(a, b)
+
+#define beginTokenize(str) { \
+  san_vector_t tokens, errList; \
+  sanv_create(&tokens, sizeof(san_token_t)); \
+  sanv_create(&errList, sizeof(san_error_t)); \
+  sant_tokenize(str, &tokens, &errList);
+
+#define endTokenize \
+  sanv_destroy(&tokens, &sant_destructor); \
+  sanv_destroy(&errList, &sane_destructor); \
+}
+
 START_TEST (test_tokenize) {
-  san_vector_t tokens;
-  san_vector_t errList;
 
-  sanv_create(&tokens, sizeof(san_token_t));
-  sanv_create(&errList, sizeof(san_error_t));
-  sant_tokenize("foo bar", &tokens, &errList);
+  beginTokenize("foo bar")
+    asrti(tokens.size, 4);
+    asrti(nth(0)->type, SAN_TOKEN_IDENTIFIER);
+    asrti(nth(1)->type, SAN_TOKEN_WHITE_SPACE);
+    asrti(nth(2)->type, SAN_TOKEN_IDENTIFIER);
+    asrti(nth(3)->type, SAN_TOKEN_END);
+    asrti(errList.size, 0);
+  endTokenize
 
-  ck_assert_int_eq(tokens.size, 4);
-  ck_assert_int_eq(((san_token_t*)sanv_nth(&tokens, 0))->type, SAN_TOKEN_IDENTIFIER);
-  ck_assert_int_eq(((san_token_t*)sanv_nth(&tokens, 1))->type, SAN_TOKEN_WHITE_SPACE);
-  ck_assert_int_eq(((san_token_t*)sanv_nth(&tokens, 2))->type, SAN_TOKEN_IDENTIFIER);
-  ck_assert_int_eq(((san_token_t*)sanv_nth(&tokens, 3))->type, SAN_TOKEN_END);
-  ck_assert_int_eq(errList.size, 0);
-  
-/*
-  sanv_destroy(tokens, &sant_destructor);
-  sanv_destroy(errList, &sane_destructor);
-*/
-  /* SEGFAULT :D
-  readTokens("foo=9", &tokens, &errList);
-  ck_assert_int_eq(tokens[1].type, SAN_TOKEN_EQUALS);
-  ck_assert(errList == NULL);
+  beginTokenize("123 + 5")
+    asrti(tokens.size, 6);
+    asrti(nth(0)->type, SAN_TOKEN_NUMBER);
+    asrti(nth(1)->type, SAN_TOKEN_WHITE_SPACE);
+    asrti(nth(2)->type, SAN_TOKEN_PLUS);
+    asrti(nth(3)->type, SAN_TOKEN_WHITE_SPACE);
+    asrti(nth(4)->type, SAN_TOKEN_NUMBER);
+    asrti(nth(5)->type, SAN_TOKEN_END);
+    asrti(errList.size, 0);
+  endTokenize
 
-  destroyTokens(tokens, 4);
-  destroyErrorList(errList);
-
-  readTokens("*+", &tokens, &errList);
-  ck_assert_int_eq(tokens[0].type, SAN_TOKEN_TIMES);
-  ck_assert_int_eq(tokens[1].type, SAN_TOKEN_PLUS);
-  ck_assert(errList == NULL);
-
-  destroyTokens(tokens, 3);
-  destroyErrorList(errList);
-  */
+  beginTokenize("   quuz = foo")
+    asrti(tokens.size, 7);
+    asrti(nth(0)->type, SAN_TOKEN_INDENTATION);
+    asrti(nth(1)->type, SAN_TOKEN_IDENTIFIER);
+    asrti(nth(2)->type, SAN_TOKEN_WHITE_SPACE);
+    asrti(nth(3)->type, SAN_TOKEN_EQUALS);
+    asrti(nth(4)->type, SAN_TOKEN_WHITE_SPACE);
+    asrti(nth(5)->type, SAN_TOKEN_IDENTIFIER);
+    asrti(nth(6)->type, SAN_TOKEN_END);
+    asrti(errList.size, 0);
+  endTokenize
 
 } END_TEST
 

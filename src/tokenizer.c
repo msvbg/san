@@ -146,9 +146,8 @@ int destroyTokens(san_token_t *tokens, int n) {
 
 int sant_destructor(void *ptr) {
   san_token_t *token = (san_token_t*)ptr;
-  if (token != NULL) {
+  if (token->raw != NULL && strcmp(token->raw, "") != 0) {
     free(token->raw);
-    free(token);
   }
   ptr = NULL;
   return SAN_OK;

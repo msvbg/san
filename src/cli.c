@@ -64,8 +64,8 @@ int main(int argc, const char **argv) {
     sanv_create(&errList, sizeof(san_error_t));
 
     strcpy(line,
-      "   f x=5\n"
-      "  g x y z=5*z"
+      "f=5*5\n"
+      "inc n = n+1"
     );
 
     if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {

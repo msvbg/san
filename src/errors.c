@@ -8,8 +8,5 @@ int sane_create(san_error_t **error) {
 }
 
 int sane_destructor(void *ptr) {
-  san_error_t *err = (san_error_t*)ptr;
-  free(err);
-  ptr = NULL;
   return SAN_OK;
 }
