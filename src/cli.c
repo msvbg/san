@@ -63,6 +63,12 @@ int main(int argc, const char **argv) {
     san_vector_t errList;
     sanv_create(&errList, sizeof(san_error_t));
 
+    strcpy(line,
+      "   f x=5\n"
+      "  f x=5\n"
+      " g x y z=5*z"
+    );
+
     if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {
       if (errList.size != 0) {
         SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
@@ -71,7 +77,11 @@ int main(int argc, const char **argv) {
       }
     }
 
-    san_node_t root;
+    SAN_VECTOR_FOR_EACH(tokens, i, san_token_t, tok)
+      printf("raw: '%s', type: %d, indent: %d\n", tok->raw, tok->type, tok->column);
+    SAN_VECTOR_END_FOR_EACH
+
+    /*san_node_t root;
     parse(&tokens, &root, &errList);
     if (errList.size != 0) {
       SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
@@ -79,7 +89,7 @@ int main(int argc, const char **argv) {
       SAN_VECTOR_END_FOR_EACH
     }
     printf("ERRORS: %d\n", errList.size);
-    printf("RESULT: %d\n", eval(&root));
+    printf("RESULT: %d\n", eval(&root));*/
     //sanv_destroy(tokens, &sant_destructor);
     //sanv_destroy(errList, &sane_destructor);
   }

@@ -3,6 +3,7 @@
 typedef struct {
   const char *inputPtr;
   san_vector_t *output;
+  int hasReadLineNonWS;
 
   int line, column;
   san_vector_t *errorList;
@@ -19,6 +20,30 @@ typedef struct {
 } while (0)
 
 /*
+ * Character matching functions
+ */
+static inline int is_alphabetic(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static inline int is_alphanumeric(char c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') \
+    || (c >= '0' && c <= '9');
+}
+
+static inline int is_keyword(const char *word) {
+  return strcmp(word, "if") == 0;
+}
+
+static inline int is_digit(char c) {
+  return c >= '0' && c <= '9';
+}
+
+static inline int is_white_space(char c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+/*
  * Tokenizer state
  */
 static int create_state(tokenizer_state_t **state, san_vector_t *errorList) {
@@ -28,6 +53,7 @@ static int create_state(tokenizer_state_t **state, san_vector_t *errorList) {
   (*state)->line = 1;
   (*state)->column = 1;
   (*state)->errorList = errorList;
+  (*state)->hasReadLineNonWS = 0;
 
   return SAN_OK;
 }
@@ -37,44 +63,25 @@ static void destroy_state(tokenizer_state_t *state) {
 }
 
 void advance(tokenizer_state_t *state) {
+  if (!state->hasReadLineNonWS && !is_white_space(*state->inputPtr))
+    state->hasReadLineNonWS = 1;
+
   if (*(state->inputPtr) == '\n') {
     ++state->line;
     state->column = 1;
+    state->hasReadLineNonWS = 0;
   } else {
     ++state->column;
   }
+
   ++state->inputPtr;
 }
 
-/*
- * Character matching functions
- */
-int isAlphabetic(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-int isAlphanumeric(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') \
-    || (c >= '0' && c <= '9');
-}
-
-int isKeyword(const char *word) {
-  return strcmp(word, "if") == 0;
-}
-
-int isDigit(char c) {
-  return c >= '0' && c <= '9';
-}
-
-int isWhiteSpace(char c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-}
-
-int classifyToken(const char *input) {
+int classify_token(const char *input) {
   const char firstChar = input[0];
-  if (isAlphabetic(firstChar)) return SAN_TOKEN_IDENTIFIER_OR_KEYWORD;
-  if (isWhiteSpace(firstChar)) return SAN_TOKEN_WHITE_SPACE;
-  if (isDigit(firstChar)) return SAN_TOKEN_NUMBER;
+  if (is_alphabetic(firstChar)) return SAN_TOKEN_IDENTIFIER_OR_KEYWORD;
+  if (is_white_space(firstChar)) return SAN_TOKEN_WHITE_SPACE;
+  if (is_digit(firstChar)) return SAN_TOKEN_NUMBER;
   if (firstChar == '=') return SAN_TOKEN_EQUALS;
   if (firstChar == '*') return SAN_TOKEN_TIMES;
   if (firstChar == '+') return SAN_TOKEN_PLUS;
@@ -84,7 +91,7 @@ int classifyToken(const char *input) {
 /*
  * Token construction/destruction
  */
-int resetToken(san_token_t *token) {
+int reset_token(san_token_t *token) {
   token->type = SAN_NO_TOKEN;
 
   if (token->raw != NULL)
@@ -102,7 +109,7 @@ static int create_tokens(san_token_t **out, unsigned int n) {
   san_token_t *tokens = calloc(n, sizeof(san_token_t));
 
   if (tokens == NULL) return SAN_FAIL;
-  for (i = 0; i < n; ++i) resetToken(tokens + i);
+  for (i = 0; i < n; ++i) reset_token(tokens + i);
   *out = tokens;
   return SAN_OK;
 }
@@ -137,8 +144,10 @@ int sant_destructor(void *ptr) {
   return SAN_OK;
 }
 
+#define LAST_TOKEN(state) ((san_token_t*)sanv_back((state)->output))
+
 int acceptChar(tokenizer_state_t *state) {
-  san_token_t *token = (san_token_t*)sanv_back(state->output);
+  san_token_t *token = LAST_TOKEN(state);
   int len = token->raw == NULL ? (unsigned)(-1) : strlen(token->raw);
 
   /* Size of old raw block is too small, so double it */
@@ -156,7 +165,7 @@ int acceptChar(tokenizer_state_t *state) {
 
 int readIdentifierOrKeyword(tokenizer_state_t *state) {
   while (*state->inputPtr != '\0') {
-    if (isAlphanumeric(*state->inputPtr)) {
+    if (is_alphanumeric(*state->inputPtr)) {
       if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
       advance(state);
     } else {
@@ -165,16 +174,25 @@ int readIdentifierOrKeyword(tokenizer_state_t *state) {
   }
 
   san_token_t *thisToken = (san_token_t*)sanv_back(state->output);
-  if (isKeyword(thisToken->raw)) thisToken->type = SAN_TOKEN_KEYWORD;
+  if (is_keyword(thisToken->raw)) thisToken->type = SAN_TOKEN_KEYWORD;
   else thisToken->type = SAN_TOKEN_IDENTIFIER;
 
   return SAN_OK;
 }
 
+int readIndentation(tokenizer_state_t *state) {
+  for (int nSpaces = 1; *state->inputPtr == ' '; ++nSpaces) {
+    if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
+    advance(state);
+  }
+  return SAN_OK;
+}
+
 int readWhiteSpace(tokenizer_state_t *state) {
   while (*state->inputPtr != '\0') {
-    if (isWhiteSpace(*state->inputPtr)) {
+    if (is_white_space(*state->inputPtr)) {
       if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
+      if (*state->inputPtr == '\n') { advance(state); break; }
       advance(state);
     } else break;
   }
@@ -183,10 +201,10 @@ int readWhiteSpace(tokenizer_state_t *state) {
 
 int readNumber(tokenizer_state_t *state) {
   while (*state->inputPtr != '\0')  {
-    if (isDigit(*state->inputPtr)) {
+    if (is_digit(*state->inputPtr)) {
       if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
       advance(state);
-    } else if(isAlphabetic(*state->inputPtr)) {
+    } else if(is_alphabetic(*state->inputPtr)) {
       san_token_t *thisToken = (san_token_t*)sanv_back(state->output);
       tokenError(state, SAN_ERROR_ADJACENT_NUMBER_ALPHA,
         *state->inputPtr, thisToken->raw);
@@ -209,22 +227,27 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
   while (*state->inputPtr != '\0') {
     san_token_t *thisToken;
     san_token_t newToken;
+    memset(&newToken, 0, sizeof(san_token_t));
     newToken.line = state->line;
     newToken.column = state->column;
-    memset(&newToken, 0, sizeof(san_token_t));
     sanv_push(state->output, &newToken);
 
     thisToken = sanv_back(state->output);
     thisToken->raw = calloc(32, sizeof(char));
     thisToken->rawSize = 32 * sizeof(char);
-    thisToken->type = classifyToken(state->inputPtr);
+    thisToken->type = classify_token(state->inputPtr);
 
     switch (thisToken->type) {
       case SAN_TOKEN_IDENTIFIER_OR_KEYWORD:
         readIdentifierOrKeyword(state);
         break;
       case SAN_TOKEN_WHITE_SPACE:
-        readWhiteSpace(state);
+        if (state->hasReadLineNonWS)
+          readWhiteSpace(state);
+        else {
+          thisToken->type = SAN_TOKEN_INDENTATION;
+          readIndentation(state);
+        }
         break;
       case SAN_TOKEN_NUMBER:
         readNumber(state);
@@ -240,7 +263,7 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
       default:
       case SAN_INVALID_TOKEN:
         tokenError(state, SAN_ERROR_INVALID_CHARACTER, *state->inputPtr);
-        resetToken(thisToken);
+        reset_token(thisToken);
         advance(state);
         continue;
     }
@@ -248,6 +271,7 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
 
   san_token_t endToken;
   endToken.type = SAN_TOKEN_END;
+  endToken.raw = "";
   sanv_push(state->output, &endToken);
 
   destroy_state(state);
