@@ -76,21 +76,18 @@ int main(int argc, const char **argv) {
       }
     }
 
-    SAN_VECTOR_FOR_EACH(tokens, i, san_token_t, tok)
-      printf("raw: '%s', type: %d, indent: %d\n", tok->raw, tok->type, tok->column);
-    SAN_VECTOR_END_FOR_EACH
-
-    /*san_node_t root;
-    parse(&tokens, &root, &errList);
+    san_node_t root;
+    sanp_parse(&tokens, &root, &errList);
     if (errList.size != 0) {
       SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
         printError(error);
       SAN_VECTOR_END_FOR_EACH
     }
     printf("ERRORS: %d\n", errList.size);
-    printf("RESULT: %d\n", eval(&root));*/
-    //sanv_destroy(tokens, &sant_destructor);
-    //sanv_destroy(errList, &sane_destructor);
+    printf("RESULT: %d\n", eval(&root));
+
+    sanv_destroy(&tokens, &sant_destructor);
+    sanv_destroy(&errList, &sane_destructor);
   }
 
   return 0;

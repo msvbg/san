@@ -356,7 +356,7 @@ void dump_ast(san_node_t *ast, int ind) {
   SAN_VECTOR_END_FOR_EACH
 }
 
-int parse(san_vector_t const *tokens, san_node_t *ast, san_vector_t *errors) {
+int sanp_parse(san_vector_t const *tokens, san_node_t *ast, san_vector_t *errors) {
   parser_state_t state;
 
   ast->type = SAN_PARSER_ROOT;
