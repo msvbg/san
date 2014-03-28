@@ -3,21 +3,31 @@
 typedef struct {
   const char *inputPtr;
   san_vector_t *output;
-  int hasReadLineNonWS;
+  int hasReadLineNonSpace;
 
   int line, column;
   san_vector_t *errorList;
 } tokenizer_state_t;
 
-#define tokenError(__state, __code, ...) do { \
-  san_error_t err; \
-  memset(&err, 0, sizeof err); \
-  err.code = __code; \
-  err.line = __state->line; \
-  err.column = __state->column; \
-  sprintf(err.msg, __code##_MSG, __VA_ARGS__); \
-  sanv_push(__state->errorList, &err); \
-} while (0)
+static san_error_t _tokenError(tokenizer_state_t *state, int code) {
+  san_error_t err;
+  memset(&err, 0, sizeof err);
+  err.code = code;
+  err.line = state->line;
+  err.column = state->column;
+  return err;
+}
+
+#define tokenError(__state, __code, ...) do {                                  \
+  san_error_t err = _tokenError(__state, __code);                              \
+  sprintf(err.msg, __code##_MSG, __VA_ARGS__);                                 \
+  sanv_push((__state)->errorList, &err);                                       \
+} while(0)
+#define tokenError0(__state, __code) do {                                      \
+  san_error_t err = _tokenError(__state, __code);                              \
+  sprintf(err.msg, __code##_MSG);                                              \
+  sanv_push((__state)->errorList, &err);                                       \
+} while(0)
 
 /*
  * Character matching functions
@@ -53,7 +63,7 @@ static int create_state(tokenizer_state_t **state, san_vector_t *errorList) {
   (*state)->line = 1;
   (*state)->column = 1;
   (*state)->errorList = errorList;
-  (*state)->hasReadLineNonWS = 0;
+  (*state)->hasReadLineNonSpace = 0;
 
   return SAN_OK;
 }
@@ -63,13 +73,13 @@ static void destroy_state(tokenizer_state_t *state) {
 }
 
 void advance(tokenizer_state_t *state) {
-  if (!state->hasReadLineNonWS && !is_white_space(*state->inputPtr))
-    state->hasReadLineNonWS = 1;
+  if (*state->inputPtr != ' ')
+    state->hasReadLineNonSpace = 1;
 
   if (*(state->inputPtr) == '\n') {
     ++state->line;
     state->column = 1;
-    state->hasReadLineNonWS = 0;
+    state->hasReadLineNonSpace = 0;
   } else {
     ++state->column;
   }
@@ -185,6 +195,9 @@ int readIndentation(tokenizer_state_t *state) {
     if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
     advance(state);
   }
+  if (*state->inputPtr == '\t')
+    tokenError0(state, SAN_ERROR_TAB_AS_INDENTATION);
+  state->hasReadLineNonSpace = 1;
   return SAN_OK;
 }
 
@@ -242,7 +255,7 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
         readIdentifierOrKeyword(state);
         break;
       case SAN_TOKEN_WHITE_SPACE:
-        if (state->hasReadLineNonWS)
+        if (state->hasReadLineNonSpace)
           readWhiteSpace(state);
         else {
           thisToken->type = SAN_TOKEN_INDENTATION;

@@ -65,8 +65,7 @@ int main(int argc, const char **argv) {
 
     strcpy(line,
       "   f x=5\n"
-      "  f x=5\n"
-      " g x y z=5*z"
+      "  g x y z=5*z"
     );
 
     if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {

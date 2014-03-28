@@ -35,6 +35,10 @@ typedef struct {
 #define SAN_ERROR_EXPECTED_TOKEN_MSG \
   "Expected token '%s' after expression '%s'"
 
+#define SAN_ERROR_TAB_AS_INDENTATION           1006
+#define SAN_ERROR_TAB_AS_INDENTATION_MSG \
+  "Tabs are not permitted to be used as indentation."
+
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
 
