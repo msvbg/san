@@ -29,7 +29,7 @@ typedef struct {
 
 #define SAN_ERROR_EXPECTED_TERM                1004
 #define SAN_ERROR_EXPECTED_TERM_MSG \
-  "Expected a term in additive expression at '%s'"
+  "Expected a term in additive expression after '%s'"
 
 #define SAN_ERROR_EXPECTED_TOKEN               1005
 #define SAN_ERROR_EXPECTED_TOKEN_MSG \
