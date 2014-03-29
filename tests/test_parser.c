@@ -13,9 +13,10 @@ typedef struct {
 
 int noop_destructor(void *ptr) {return SAN_OK;}
 
-#define BEGIN_WALK_TREE(expr) { \
+#define BEGIN_WALK_TREE(_expr) { \
   san_vector_t tokens, errorList; \
   san_node_t ast; \
+  const char *expr = _expr; \
   sanv_create(&errorList, sizeof(san_error_t)); \
   sanv_create(&tokens, sizeof(san_token_t)); \
   sant_tokenize(expr, &tokens, &errorList); \
@@ -30,6 +31,8 @@ int noop_destructor(void *ptr) {return SAN_OK;}
   expectation_t exp = { what, parent, 0, #what " " #parent }; \
   sanv_push(&expectations, &exp); \
 } while (0);
+
+#define expect_no_errors ck_assert_int_eq(errorList.size, 0);
 
 void __flatten(san_vector_t *vec, san_node_t const* root) {
   if (root->children.size > 0) {
@@ -54,7 +57,7 @@ void __flatten(san_vector_t *vec, san_node_t const* root) {
   SAN_VECTOR_END_FOR_EACH \
   SAN_VECTOR_FOR_EACH(expectations, i, expectation_t, exp) \
     if (!exp->satisfied) { \
-      printf("Unsatisfied expectation: %s\n", exp->msg); \
+      printf("Unsatisfied expectation: %s in '%s'\n", exp->msg, expr); \
       ck_assert_int_eq(1, 0); \
     } \
   SAN_VECTOR_END_FOR_EACH \
@@ -71,7 +74,7 @@ START_TEST (test_empty_input) {
   ck_assert_int_eq(sanp_parse(NULL, &ast, &errors), SAN_FAIL);
 } END_TEST
 
-START_TEST (test_addition) {
+START_TEST (test_function_definition) {
 
   BEGIN_WALK_TREE("somefunc param1 param2 = n + 1")
     expect_exists(
@@ -80,6 +83,11 @@ START_TEST (test_addition) {
     expect_exists(
       SAN_PARSER_FUNCTION_PARAMETER
       , with_parent SAN_PARSER_FUNCTION_PARAMETER_LIST)
+    expect_exists(
+      SAN_PARSER_EXPRESSION
+      , with_parent SAN_PARSER_VARIABLE_DEFINITION
+    )
+    expect_no_errors
   END_WALK_TREE
 
 } END_TEST
@@ -89,7 +97,7 @@ Suite* parser_suite(void) {
 
   TCase *tc_core = tcase_create("Core");
   tcase_add_test(tc_core, test_empty_input);
-  tcase_add_test(tc_core, test_addition);
+  tcase_add_test(tc_core, test_function_definition);
   suite_add_tcase(s, tc_core);
 
   return s;

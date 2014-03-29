@@ -120,14 +120,14 @@ char *fmt(int n){
 void add_child(parser_state_t *state, int nodeIndex) {
   san_node_t tmp;
   san_node_t *node = sanv_nth(&state->nodeStack, nodeIndex);
-  printf("\nNODE STACK\n");
+  san_dbg("\nNODE STACK\n");
   SAN_VECTOR_FOR_EACH(state->nodeStack, i, san_node_t, node)
-    printf("%d: %s, '%s'\n", i, fmt(node->type), node->token->raw);
+    san_dbg("%d: %s, '%s'\n", i, fmt(node->type), node->token->raw);
   SAN_VECTOR_END_FOR_EACH
   sanv_pop(&state->nodeStack, &tmp);
   sanv_push(&node->children, &tmp);
-  printf("Popping [node type=%s, size=%d] onto [node type=%s, size=%d]\n", fmt(tmp.type), tmp.children.size, fmt(node->type), node->children.size);
-  printf("\n");
+  san_dbg("Popping [node type=%s, size=%d] onto [node type=%s, size=%d]\n", fmt(tmp.type), tmp.children.size, fmt(node->type), node->children.size);
+  san_dbg("\n");
 }
 
 static inline parser_state_t clone_state(parser_state_t const *state) {
@@ -154,7 +154,7 @@ int parse_terminal(parser_state_t const *state, parser_state_t *newState, int te
 }
 
 int parse_number_literal(parser_state_t const *state, parser_state_t *newState) {
-  printf("Parsing number literal\n");
+  san_dbg("Parsing number literal\n");
         fflush(stdout);
   *newState = clone_state(state);
   push_node(newState, SAN_PARSER_NUMBER_LITERAL);
@@ -167,7 +167,7 @@ int parse_number_literal(parser_state_t const *state, parser_state_t *newState) 
 }
 
 int parse_primary_exp(parser_state_t const *state, parser_state_t *newState) {
-  printf("Parsing primary expression\n");
+  san_dbg("Parsing primary expression\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_PRIMARY_EXPRESSION);
   parser_state_t s1;
@@ -184,7 +184,7 @@ int parse_primary_exp(parser_state_t const *state, parser_state_t *newState) {
 }
 
 int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
-  printf("Parsing mult exp\n");
+  san_dbg("Parsing mult exp\n");
   fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_MULTIPLICATIVE_EXPRESSION);
@@ -210,7 +210,7 @@ int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
 }
 
 int parse_additive_exp(parser_state_t const *state, parser_state_t *newState) {
-  printf("Parsing additive exp\n");
+  san_dbg("Parsing additive exp\n");
   fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_ADDITIVE_EXPRESSION);
@@ -239,7 +239,7 @@ int parse_additive_exp(parser_state_t const *state, parser_state_t *newState) {
 }
 
 int parse_exp(parser_state_t const *state, parser_state_t *newState) {
-  printf("Parsing expression\n");
+  san_dbg("Parsing expression\n");
         fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_EXPRESSION);
@@ -253,7 +253,7 @@ int parse_exp(parser_state_t const *state, parser_state_t *newState) {
 }
 
 int parse_func_param(parser_state_t *state, parser_state_t *newState) {
-  printf("Parsing function parameter\n");
+  san_dbg("Parsing function parameter\n");
   *newState = clone_state(state);
   push_node(newState, SAN_PARSER_FUNCTION_PARAMETER);
 
@@ -265,7 +265,7 @@ int parse_func_param(parser_state_t *state, parser_state_t *newState) {
 }
 
 int parse_func_param_list(parser_state_t *state, parser_state_t *newState) {
-  printf("Parsing function parameters\n");
+  san_dbg("Parsing function parameters\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_PARAMETER_LIST);
   int result = SAN_NO_MATCH;
@@ -281,7 +281,7 @@ int parse_func_param_list(parser_state_t *state, parser_state_t *newState) {
 }
 
 int parse_lvalue(parser_state_t *state, parser_state_t *newState) {
-  printf("Parsing lvalue\n");
+  san_dbg("Parsing lvalue\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_LVALUE);
   int result = SAN_NO_MATCH;
@@ -300,7 +300,7 @@ int parse_lvalue(parser_state_t *state, parser_state_t *newState) {
 }
 
 int parse_variable_defn(parser_state_t *state, parser_state_t *newState) {
-  printf("Parsing variable definition\n");
+  san_dbg("Parsing variable definition\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_VARIABLE_DEFINITION);
   parser_state_t s1, s2, s3;
@@ -330,7 +330,7 @@ int parse_variable_defn(parser_state_t *state, parser_state_t *newState) {
 }
 
 int parse_stmt(parser_state_t *state, parser_state_t *newState) {
-  printf("Parsing statement\n");
+  san_dbg("Parsing statement\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_STATEMENT);
   parser_state_t s1;
@@ -343,13 +343,13 @@ int parse_stmt(parser_state_t *state, parser_state_t *newState) {
 }
 
 void indent(int n) {
-  for(int i = 0; i < n; ++i) printf(" ");
+  for(int i = 0; i < n; ++i) san_dbg(" ");
 }
 
 void dump_ast(san_node_t *ast, int ind) {
   indent(ind);
   int type = ast != NULL ? ast->type : -1;
-  printf("[node type: %s, ptr: '%s', nchildren: %d]\n", fmt(type), ast->token->raw, ast->children.size);
+  san_dbg("[node type: %s, ptr: '%s', nchildren: %d]\n", fmt(type), ast->token->raw, ast->children.size);
   fflush(stdout);
   SAN_VECTOR_FOR_EACH(ast->children, i, san_node_t, node)
     dump_ast(node, ind+2);

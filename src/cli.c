@@ -63,11 +63,6 @@ int main(int argc, const char **argv) {
     san_vector_t errList;
     sanv_create(&errList, sizeof(san_error_t));
 
-    strcpy(line,
-      "f=5*5\n"
-      "inc n = n+1"
-    );
-
     if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {
       if (errList.size != 0) {
         SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
