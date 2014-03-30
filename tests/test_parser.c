@@ -32,7 +32,14 @@ int noop_destructor(void *ptr) {return SAN_OK;}
   sanv_push(&expectations, &exp); \
 } while (0);
 
-#define expect_no_errors ck_assert_int_eq(errorList.size, 0);
+#define expect_no_errors do { \
+  if (errorList.size > 0) { \
+    SAN_VECTOR_FOR_EACH(errorList, i, san_error_t, error) \
+      printf("Error %d: %s\n", i+1, error->msg); \
+    SAN_VECTOR_END_FOR_EACH \
+  } \
+  ck_assert_int_eq(errorList.size, 0); \
+} while(0);
 
 void __flatten(san_vector_t *vec, san_node_t const* root) {
   if (root->children.size > 0) {
@@ -76,7 +83,10 @@ START_TEST (test_empty_input) {
 
 START_TEST (test_function_definition) {
 
-  BEGIN_WALK_TREE("somefunc param1 param2 = n + 1")
+  BEGIN_WALK_TREE("let somefunc param1 param2 = n + 1")
+    expect_exists(
+      SAN_PARSER_LVALUE
+      , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
     expect_exists(
       SAN_PARSER_MULTIPLICATIVE_EXPRESSION
       , with_parent SAN_PARSER_ADDITIVE_EXPRESSION)
@@ -84,8 +94,8 @@ START_TEST (test_function_definition) {
       SAN_PARSER_FUNCTION_PARAMETER
       , with_parent SAN_PARSER_FUNCTION_PARAMETER_LIST)
     expect_exists(
-      SAN_PARSER_EXPRESSION
-      , with_parent SAN_PARSER_VARIABLE_DEFINITION
+      SAN_PARSER_VARIABLE_EXPRESSION
+      , with_parent SAN_PARSER_EXPRESSION
     )
     expect_no_errors
   END_WALK_TREE

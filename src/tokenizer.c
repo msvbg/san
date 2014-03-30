@@ -41,10 +41,6 @@ static inline int is_alphanumeric(char c) {
     || (c >= '0' && c <= '9');
 }
 
-static inline int is_keyword(const char *word) {
-  return strcmp(word, "if") == 0;
-}
-
 static inline int is_digit(char c) {
   return c >= '0' && c <= '9';
 }
@@ -181,10 +177,6 @@ int readIdentifierOrKeyword(tokenizer_state_t *state) {
       break;
     }
   }
-
-  san_token_t *thisToken = (san_token_t*)sanv_back(state->output);
-  if (is_keyword(thisToken->raw)) thisToken->type = SAN_TOKEN_KEYWORD;
-  else thisToken->type = SAN_TOKEN_IDENTIFIER;
 
   return SAN_OK;
 }

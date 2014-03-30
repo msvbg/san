@@ -37,7 +37,11 @@ typedef struct {
 
 #define SAN_ERROR_TAB_AS_INDENTATION           1006
 #define SAN_ERROR_TAB_AS_INDENTATION_MSG \
-  "Tabs are not permitted to be used as indentation."
+  "Tabs are not permitted to be used as indentation"
+
+#define SAN_ERROR_EXPECTED_LVALUE              1007
+#define SAN_ERROR_EXPECTED_LVALUE_MSG \
+  "Expected an L-value after 'let' keyword in '%s'"
 
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
