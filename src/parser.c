@@ -7,6 +7,7 @@ typedef struct {
   san_vector_t nodeStack;
 
   san_vector_t *errors;
+  int indentSensitive;
 } parser_state_t;
 
 typedef int (*parser_t)(parser_state_t *state);
@@ -15,14 +16,29 @@ typedef int (*parser_t)(parser_state_t *state);
 #define SAN_NO_MATCH    2
 #define SAN_ERR_MATCH   3
 
-#define parseError(__state, __code, ...) do { \
-  san_error_t err; \
-  memset(&err, 0, sizeof err); \
-  err.code = __code; \
-  err.line = (__state)->tokenPtr->line; \
-  err.column = (__state)->tokenPtr->column; \
-  sprintf(err.msg, __code##_MSG, __VA_ARGS__); \
-  sanv_push((__state)->errors, &err); \
+static san_error_t _parseError(parser_state_t *state, int code) {
+  san_error_t err;
+  memset(&err, 0, sizeof err);
+  err.code = code;
+  err.line = (state)->tokenPtr->line;
+  err.column = (state)->tokenPtr->column;
+  return err;
+}
+
+#define parseError(__beginState, __endState, __code, ...) do { \
+  char raw[1024]; \
+  rawTokens((__beginState), (__endState), raw, 1024); \
+  san_error_t err = _parseError(__beginState, __code); \
+  sprintf(err.msg, __code##_MSG, raw, __VA_ARGS__); \
+  sanv_push((__beginState)->errors, &err); \
+} while (0)
+
+#define parseError0(__beginState, __endState, __code) do { \
+  char raw[1024]; \
+  rawTokens((__beginState), (__endState), raw, 1024); \
+  san_error_t err = _parseError(__beginState, __code); \
+  sprintf(err.msg, __code##_MSG, raw); \
+  sanv_push((__beginState)->errors, &err); \
 } while (0)
 
 int parse_exp(parser_state_t const *state, parser_state_t *newState);
@@ -37,7 +53,8 @@ static inline int head_is(parser_state_t const *state, int tokenType) {
 
 static inline parser_state_t consume_white_space(parser_state_t const *state) {
   parser_state_t newState = *state;
-  while (head_is(&newState, SAN_TOKEN_WHITE_SPACE))
+  while (head_is(&newState, SAN_TOKEN_WHITE_SPACE) ||
+    (!state->indentSensitive && head_is(&newState, SAN_TOKEN_INDENTATION)))
     newState.tokenPtr += 1;
   return newState;
 }
@@ -79,7 +96,7 @@ static inline parser_state_t advance_state(parser_state_t *state) {
   return newState;
 }
 
-int push_node(parser_state_t *state, int type) {
+static int push_node(parser_state_t *state, int type) {
   san_node_t node;
   node.type = type;
 
@@ -93,24 +110,23 @@ int push_node(parser_state_t *state, int type) {
   return state->nodeStack.size - 1;
 }
 
-void pop_node(parser_state_t *state) {
-  void *tmp = NULL;
-  sanv_pop(&state->nodeStack, tmp);
-}
+//static void begin_indent(parser_state_t *state, int depth);
 
 char *fmt(int n){
   switch(n) {
   case 0: return "NULL"; break;
-  case 1: return "Root"; break;
-  case 2: return "Expression"; break;
-  case 3: return "Identifier"; break;
-  case 4: return "Number literal"; break;
-  case 5: return "Additive expr"; break;
-  case 6: return "Mult expr"; break;
+  case SAN_PARSER_ROOT: return "Root"; break;
+  case SAN_PARSER_EXPRESSION: return "Expression"; break;
+  case SAN_PARSER_IDENTIFIER: return "Identifier"; break;
+  case SAN_PARSER_NUMBER_LITERAL: return "Number literal"; break;
+  case SAN_PARSER_ADDITIVE_EXPRESSION: return "Additive expr"; break;
+  case SAN_PARSER_MULTIPLICATIVE_EXPRESSION: return "Mult expr"; break;
   case SAN_PARSER_VARIABLE_EXPRESSION: return "Variable definition"; break;
-  case SAN_PARSER_LVALUE: return "L-value"; break;
+  case SAN_PARSER_VARIABLE_LVALUE: return "Variable L-value"; break;
+  case SAN_PARSER_FUNCTION_LVALUE: return "Function L-value"; break;
   case SAN_PARSER_FUNCTION_PARAMETER_LIST: return "Function parameter list"; break;
   case SAN_PARSER_FUNCTION_PARAMETER: return "Function parameter"; break;
+  case SAN_PARSER_FUNCTION_BODY: return "Function body"; break;
   case SAN_PARSER_PRIMARY_EXPRESSION: return "Primary expression"; break;
   }
   return "ERR";
@@ -142,7 +158,7 @@ static inline parser_state_t clone_state(parser_state_t const *state) {
  * Parser functions
  */
 
-int parse_terminal(parser_state_t const *state, parser_state_t *newState, int terminal) {
+static int parse_terminal(parser_state_t const *state, parser_state_t *newState, int terminal) {
   if (state->tokenPtr->type == SAN_TOKEN_END) return SAN_NO_MATCH;
   *newState = consume_white_space(state);
   if (head_is(newState, terminal)) {
@@ -157,8 +173,11 @@ static inline int parse_keyword(
   parser_state_t *newState,
   const char* keyword
 ) {
-  return parse_terminal(state, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) &&
-    strcmp(state->tokenPtr->raw, keyword) == 0 ? SAN_MATCH : SAN_NO_MATCH;
+  san_dbg("KW() state: '%s'\n", state->tokenPtr->raw);
+  *newState = consume_white_space(state);
+  return strcmp(newState->tokenPtr->raw, keyword) == 0 &&
+    parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) == SAN_MATCH
+    ? SAN_MATCH : SAN_NO_MATCH;
 }
 
 int parse_number_literal(parser_state_t const *state, parser_state_t *newState) {
@@ -234,9 +253,7 @@ int parse_additive_exp(parser_state_t const *state, parser_state_t *newState) {
         add_child(&s2, nodeIndex);
         *newState = s2;
       } else {
-        char raw[1024];
-        rawTokens(state, &s2, raw, 1024);
-        parseError(state, SAN_ERROR_EXPECTED_TERM, raw);
+        parseError0(newState, &s2, SAN_ERROR_EXPECTED_TERM);
         return SAN_ERR_MATCH;
       }
     }
@@ -274,23 +291,64 @@ int parse_func_param_list(parser_state_t *state, parser_state_t *newState) {
   return result;
 }
 
-int parse_lvalue(parser_state_t *state, parser_state_t *newState) {
-  san_dbg("Parsing lvalue\n");
+int parse_var_lvalue(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing variable L-value\n");
   *newState = clone_state(state);
-  int nodeIndex = push_node(newState, SAN_PARSER_LVALUE);
+  push_node(newState, SAN_PARSER_VARIABLE_LVALUE);
   int result = SAN_NO_MATCH;
 
   if (parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) != SAN_NO_MATCH) {
     result = SAN_MATCH;
   }
 
+  return result;
+}
+
+static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing function L-value\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_LVALUE);
   parser_state_t s1;
-  if (parse_func_param_list(newState, &s1) != SAN_NO_MATCH) {
-    add_child(&s1, nodeIndex);
-    *newState = s1;
+
+  newState->indentSensitive = 0;
+
+  if (parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) != SAN_NO_MATCH) {
+    if (parse_func_param_list(newState, &s1) != SAN_NO_MATCH) {
+      add_child(&s1, nodeIndex);
+      *newState = s1;
+      return SAN_MATCH;
+    }
   }
 
-  return result;
+  return SAN_NO_MATCH;
+}
+
+static int parse_func_body(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing function body\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_BODY);
+  parser_state_t s1;
+
+  newState->indentSensitive = 1;
+
+  if (parse_exp(newState, &s1) != SAN_NO_MATCH) {
+    add_child(&s1, nodeIndex);
+    *newState = s1;
+    return SAN_MATCH;
+  } else {
+    int foundBlock = 0;
+    while (parse_terminal(newState, newState, SAN_TOKEN_INDENTATION) != SAN_NO_MATCH) {
+      foundBlock = 1;
+      if (parse_exp(newState, newState) != SAN_NO_MATCH) {
+        add_child(newState, nodeIndex);
+      }
+    }
+    if (foundBlock) {
+      return SAN_MATCH;
+    }
+  }
+
+  return SAN_NO_MATCH;
 }
 
 int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
@@ -299,7 +357,22 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
   int nodeIndex = push_node(newState, SAN_PARSER_VARIABLE_EXPRESSION);
   parser_state_t s1, s2, s3, s4;
   if (parse_keyword(newState, &s1, SAN_KEYWORD_LET) != SAN_NO_MATCH) {
-    if (parse_lvalue(&s1, &s2) != SAN_NO_MATCH) {
+    if (parse_func_lvalue(&s1, &s2) != SAN_NO_MATCH) {
+      add_child(&s2, nodeIndex);
+
+      if (parse_terminal(&s2, &s3, SAN_TOKEN_EQUALS) != SAN_NO_MATCH) {
+        if (parse_func_body(&s3, &s4) != SAN_NO_MATCH) {
+          add_child(&s4, nodeIndex);
+          *newState = s4;
+          return SAN_MATCH;
+        } else {
+          parseError0(newState, &s3, SAN_ERROR_EXPECTED_FUNCTION_BODY);
+          return SAN_ERR_MATCH;
+        }
+      } else {
+        return SAN_NO_MATCH;
+      }
+    } else if (parse_var_lvalue(&s1, &s2) != SAN_NO_MATCH) {
       add_child(&s2, nodeIndex);
 
       if (parse_terminal(&s2, &s3, SAN_TOKEN_EQUALS) != SAN_NO_MATCH) {
@@ -308,18 +381,14 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
           *newState = s4;
           return SAN_MATCH;
         } else {
-          char raw[1024];
-          rawTokens(state, &s3, raw, 1024);
-          parseError(state, SAN_ERROR_EXPECTED_EXPRESSION, raw);
+          parseError0(newState, &s3, SAN_ERROR_EXPECTED_EXPRESSION);
           return SAN_ERR_MATCH;
         }
       } else {
         return SAN_NO_MATCH;
       }
     } else {
-      char raw[1024];
-      rawTokens(state, &s1, raw, 1024);
-      parseError(state, SAN_ERROR_EXPECTED_LVALUE, raw);
+      parseError0(state, &s1, SAN_ERROR_EXPECTED_LVALUE);
       return SAN_ERR_MATCH;
     }
   }
@@ -328,7 +397,6 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
 
 int parse_exp(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing expression\n");
-        fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_EXPRESSION);
   parser_state_t s1;
@@ -370,6 +438,7 @@ int sanp_parse(san_vector_t const *tokens, san_node_t *ast, san_vector_t *errors
   state.tokens = tokens;
   state.errors = errors;
   state.tokenPtr = tokens->elems;
+  state.indentSensitive = 1;
 
   int firstIndex = push_node(&state, SAN_PARSER_ROOT);
   parser_state_t s1;

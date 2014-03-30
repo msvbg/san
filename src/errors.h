@@ -43,6 +43,10 @@ typedef struct {
 #define SAN_ERROR_EXPECTED_LVALUE_MSG \
   "Expected an L-value after 'let' keyword in '%s'"
 
+#define SAN_ERROR_EXPECTED_FUNCTION_BODY       1008
+#define SAN_ERROR_EXPECTED_FUNCTION_BODY_MSG \
+  "Expected a function body after '=' in '%s'"
+
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
 

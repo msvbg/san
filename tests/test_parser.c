@@ -83,9 +83,9 @@ START_TEST (test_empty_input) {
 
 START_TEST (test_function_definition) {
 
-  BEGIN_WALK_TREE("let somefunc param1 param2 = n + 1")
+  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = n + 1")
     expect_exists(
-      SAN_PARSER_LVALUE
+      SAN_PARSER_FUNCTION_LVALUE
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
     expect_exists(
       SAN_PARSER_MULTIPLICATIVE_EXPRESSION
@@ -97,6 +97,13 @@ START_TEST (test_function_definition) {
       SAN_PARSER_VARIABLE_EXPRESSION
       , with_parent SAN_PARSER_EXPRESSION
     )
+    expect_no_errors
+  END_WALK_TREE
+
+  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = let x y = y")
+    expect_exists(
+      SAN_PARSER_FUNCTION_BODY
+      , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
     expect_no_errors
   END_WALK_TREE
 
