@@ -62,3 +62,10 @@ int sanv_pop(san_vector_t *vector, void *value) {
   vector->size -= 1;
   return SAN_OK;
 }
+
+int sanv_pop_all(san_vector_t *vector) {
+  vector->size = 0;
+  return SAN_OK;
+}
+
+int sanv_nodestructor(void *ptr) { return SAN_OK; }

@@ -4,7 +4,7 @@
 #include "tokenizer.h"
 #include "parser.h"
 
-void printError(san_error_t const *error) {
+void print_error(san_error_t const *error) {
   const char *file = "CLI";
   if (error->file != NULL)
     file = error->file;
@@ -17,44 +17,31 @@ void printError(san_error_t const *error) {
     error->code, error->msg);
 }
 
-int eval(san_node_t *node) {
-  int total;
-
-  if (node->type == SAN_PARSER_ADDITIVE_EXPRESSION) {
-    total = 0;
-    SAN_VECTOR_FOR_EACH(node->children, i, san_node_t, n)
-      total += eval(n);
-    SAN_VECTOR_END_FOR_EACH
-    return total;
-  } else if (node->type == SAN_PARSER_MULTIPLICATIVE_EXPRESSION) {
-    total = 1;
-    SAN_VECTOR_FOR_EACH(node->children, i, san_node_t, n)
-      total *= eval(n);
-    SAN_VECTOR_END_FOR_EACH
-    return total;
-  } else if(node->type == SAN_PARSER_NUMBER_LITERAL) {
-    return atoi(node->token->raw);
-  } else if(node->children.size == 1) {
-    return eval(sanv_nth(&node->children, 0));
-  }
-  return -1;
-}
-
 int main(int argc, const char **argv) {
+  static const int MAX_LINE_LEN = 1024;
+  int isReadingMultiline = 0;
+  san_vector_t input;
+  sanv_create(&input, sizeof(char) * MAX_LINE_LEN);
 
   while (1) {
-    printf("> ");
+    char line[MAX_LINE_LEN];
 
-    char line[1024];
-    fgets(line, 1024, stdin);
+    if (!isReadingMultiline) {
+      printf("san> ");
+      fgets(line, MAX_LINE_LEN, stdin);
+      sanv_pop_all(&input);
+      sanv_push(&input, line);
 
-    /* Replace newline at end with \0 */
-    if (line[strlen(line) -1] == '\n') {
-      line[strlen(line) - 1] = '\0';
-    }
-
-    if (strcmp(line, "quit") == 0) {
-      break;
+      if (strcmp(line, "quit\n") == 0) {
+        break;
+      }
+    } else {
+      printf("...> ");
+      fgets(line, MAX_LINE_LEN, stdin);
+      if (strcmp(line, "\n") != 0) {
+        sanv_push(&input, line);
+        continue;
+      }
     }
 
     san_vector_t tokens;
@@ -63,27 +50,43 @@ int main(int argc, const char **argv) {
     san_vector_t errList;
     sanv_create(&errList, sizeof(san_error_t));
 
-    if (sant_tokenize(line, &tokens, &errList) == SAN_OK) {
+    char *inputString = malloc(sizeof(char) * MAX_LINE_LEN * input.size);
+    char *inputPtr = inputString;
+    for (int i = 0; i < input.size; ++i) {
+      char *thisLine = (char*)sanv_nth(&input, i);
+      int lineLen = strlen(thisLine);
+      strncpy(inputPtr, thisLine, lineLen);
+      inputPtr += lineLen;
+    }
+
+    if (sant_tokenize(inputString, &tokens, &errList) == SAN_OK) {
       if (errList.size != 0) {
         SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
-          printError(error);
+          print_error(error);
         SAN_VECTOR_END_FOR_EACH
       }
     }
 
     san_node_t root;
     sanp_parse(&tokens, &root, &errList);
-    if (errList.size != 0) {
+
+    isReadingMultiline = 0;
+    san_error_t *last = sanv_back(&errList);
+    if (errList.size == 1 && last->code == SAN_ERROR_EXPECTED_BLOCK && !isReadingMultiline) {
+      isReadingMultiline = 1;
+    } else if (errList.size != 0) {
       SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
-        printError(error);
+        print_error(error);
       SAN_VECTOR_END_FOR_EACH
+      printf("ERRORS: %d\n", errList.size);
     }
-    printf("ERRORS: %d\n", errList.size);
-    printf("RESULT: %d\n", eval(&root));
 
     sanv_destroy(&tokens, &sant_destructor);
     sanv_destroy(&errList, &sane_destructor);
+    free(inputString);
   }
+
+  sanv_destroy(&input, sanv_nodestructor);
 
   return 0;
 }

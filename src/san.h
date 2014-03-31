@@ -31,7 +31,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#define SAN_DEBUG 1
+#define SAN_DEBUG 0
 #if SAN_DEBUG == 1
 #define san_dbg(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
 #else

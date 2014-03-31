@@ -411,7 +411,7 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
           *newState = s4;
           return SAN_MATCH;
         } else {
-          parseError0(newState, &s3, SAN_ERROR_EXPECTED_FUNCTION_BODY);
+          parseError0(newState, &s3, SAN_ERROR_EXPECTED_BLOCK);
           return SAN_ERR_MATCH;
         }
       } else {
@@ -464,7 +464,7 @@ int parse_if_exp(parser_state_t *state, parser_state_t *newState) {
         *newState = s3;
         return SAN_MATCH;
       } else {
-        parseError(state, &s2, SAN_ERROR_EXPECTED_BLOCK, "if");
+        parseError0(state, &s2, SAN_ERROR_EXPECTED_BLOCK);
         return SAN_ERR_MATCH;
       }
     } else {
