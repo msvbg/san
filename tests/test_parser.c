@@ -111,7 +111,13 @@ START_TEST (test_function_indentation) {
     expect_no_errors
   END_WALK_TREE
 
-  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 =\n let x y =\n  y")
+  BEGIN_WALK_TREE(
+    "let\n"
+    " somefunc\n"
+    "   param1 param2 =\n"
+    "    let x y =\n"
+    "     y\n"
+    "    let z = 5")
     expect_exists(
       SAN_PARSER_FUNCTION_BODY
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)

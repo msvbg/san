@@ -49,7 +49,7 @@ typedef struct {
 
 #define SAN_ERROR_BAD_INDENTATION              1009
 #define SAN_ERROR_BAD_INDENTATION_MSG \
-  "Indentation error at '%s'."
+  "Indentation error"
 
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);

@@ -52,7 +52,11 @@ static inline int head_is(parser_state_t const *state, int tokenType) {
     return state->tokenPtr->type == tokenType;
 }
 
-static inline parser_state_t consume_white_space(parser_state_t const *state) {
+static inline int head_len(parser_state_t const *state) {
+  return strlen(state->tokenPtr->raw);
+}
+
+static inline parser_state_t eat_wspace(parser_state_t const *state) {
   parser_state_t newState = *state;
   while (head_is(&newState, SAN_TOKEN_WHITE_SPACE) ||
     (!state->indentSensitive && head_is(&newState, SAN_TOKEN_INDENTATION)))
@@ -93,7 +97,7 @@ void rawTokens(parser_state_t const *s1, parser_state_t const *s2, char *out, si
 }
 
 static inline parser_state_t advance_state(parser_state_t *state) {
-  parser_state_t newState = consume_white_space(state);
+  parser_state_t newState = eat_wspace(state);
   newState.tokenPtr = state->tokenPtr + 1;
   return newState;
 }
@@ -102,7 +106,7 @@ static int push_node(parser_state_t *state, int type) {
   san_node_t node;
   node.type = type;
 
-  parser_state_t noWhitespace = consume_white_space(state);
+  parser_state_t noWhitespace = eat_wspace(state);
   node.token = noWhitespace.tokenPtr;
   sanv_create(&node.children, sizeof(san_node_t));
   if (state->nodeStack.capacity == 0) {
@@ -137,14 +141,14 @@ char *fmt(int n){
 void add_child(parser_state_t *state, int nodeIndex) {
   san_node_t tmp;
   san_node_t *node = sanv_nth(&state->nodeStack, nodeIndex);
-  san_dbg("\nNODE STACK\n");
-  SAN_VECTOR_FOR_EACH(state->nodeStack, i, san_node_t, node)
-    san_dbg("%d: %s, '%s'\n", i, fmt(node->type), node->token->raw);
-  SAN_VECTOR_END_FOR_EACH
+  //san_dbg("\nNODE STACK\n");
+  //SAN_VECTOR_FOR_EACH(state->nodeStack, i, san_node_t, node)
+    //san_dbg("%d: %s, '%s'\n", i, fmt(node->type), node->token->raw);
+  //SAN_VECTOR_END_FOR_EACH
   sanv_pop(&state->nodeStack, &tmp);
   sanv_push(&node->children, &tmp);
-  san_dbg("Popping [node type=%s, size=%d] onto [node type=%s, size=%d]\n", fmt(tmp.type), tmp.children.size, fmt(node->type), node->children.size);
-  san_dbg("\n");
+  //san_dbg("Popping [node type=%s, size=%d] onto [node type=%s, size=%d]\n", fmt(tmp.type), tmp.children.size, fmt(node->type), node->children.size);
+  //san_dbg("\n");
 }
 
 static inline parser_state_t clone_state(parser_state_t const *state) {
@@ -165,11 +169,12 @@ static inline int indent_depth(parser_state_t *state) {
 
 static int push_indent(parser_state_t *state) {
   int depth = 0;
-  parser_state_t s1 = consume_white_space(state);
+  parser_state_t s1 = eat_wspace(state);
   if (head_is(&s1, SAN_TOKEN_INDENTATION)) {
     depth = strlen(s1.tokenPtr->raw);
     if (indent_depth(&s1) >= depth) {
       san_error_t err = _parseError(state, SAN_ERROR_BAD_INDENTATION);
+      strcpy(err.msg, SAN_ERROR_BAD_INDENTATION_MSG);
       sanv_push(state->errors, &err);
       return 0;
     }
@@ -189,7 +194,7 @@ static inline void pop_indent(parser_state_t *state) {
 
 static int parse_terminal(parser_state_t const *state, parser_state_t *newState, int terminal) {
   if (state->tokenPtr->type == SAN_TOKEN_END) return SAN_NO_MATCH;
-  *newState = consume_white_space(state);
+  *newState = eat_wspace(state);
   if (head_is(newState, terminal)) {
     *newState = advance_state(newState);
     return SAN_MATCH;
@@ -202,7 +207,7 @@ static inline int parse_keyword(
   parser_state_t *newState,
   const char* keyword
 ) {
-  *newState = consume_white_space(state);
+  *newState = eat_wspace(state);
   return strcmp(newState->tokenPtr->raw, keyword) == 0 &&
     parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) == SAN_MATCH
     ? SAN_MATCH : SAN_NO_MATCH;
@@ -351,7 +356,7 @@ static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
   return result;
 }
 
-static int parse_func_body(parser_state_t *state, parser_state_t *newState) {
+static int parse_func_body(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing function body\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_BODY);
@@ -369,7 +374,10 @@ static int parse_func_body(parser_state_t *state, parser_state_t *newState) {
   } else {
     int foundBlock = 0;
     int depth = push_indent(newState);
-    while (parse_terminal(newState, newState, SAN_TOKEN_INDENTATION) != SAN_NO_MATCH && indent_depth(newState) == depth) {
+    for (*newState = eat_wspace(newState);
+        head_len(newState) == depth &&
+        parse_terminal(newState, newState, SAN_TOKEN_INDENTATION) != SAN_NO_MATCH;
+        *newState = eat_wspace(newState)) {
       foundBlock = 1;
       if (parse_exp(newState, newState) != SAN_NO_MATCH) {
         add_child(newState, nodeIndex);
