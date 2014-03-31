@@ -421,8 +421,11 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
       add_child(&s2, nodeIndex);
 
       if (parse_terminal(&s2, &s3, SAN_TOKEN_EQUALS) != SAN_NO_MATCH) {
+        int oldIndentSenst = s3.indentSensitive;
+        s3.indentSensitive = 0;
         if (parse_exp(&s3, &s4) != SAN_NO_MATCH) {
           add_child(&s4, nodeIndex);
+          s4.indentSensitive = oldIndentSenst;
           *newState = s4;
           return SAN_MATCH;
         } else {
