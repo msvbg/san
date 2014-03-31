@@ -132,8 +132,9 @@ char *fmt(int n){
   case SAN_PARSER_FUNCTION_LVALUE: return "Function L-value"; break;
   case SAN_PARSER_FUNCTION_PARAMETER_LIST: return "Function parameter list"; break;
   case SAN_PARSER_FUNCTION_PARAMETER: return "Function parameter"; break;
-  case SAN_PARSER_FUNCTION_BODY: return "Function body"; break;
+  case SAN_PARSER_BLOCK: return "Block"; break;
   case SAN_PARSER_PRIMARY_EXPRESSION: return "Primary expression"; break;
+  case SAN_PARSER_IF_EXPRESSION: return "If expression"; break;
   }
   return "ERR";
 }
@@ -356,10 +357,10 @@ static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
   return result;
 }
 
-static int parse_func_body(parser_state_t const *state, parser_state_t *newState) {
-  san_dbg("Parsing function body\n");
+static int parse_block(parser_state_t const *state, parser_state_t *newState) {
+  san_dbg("Parsing block body\n");
   *newState = clone_state(state);
-  int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_BODY);
+  int nodeIndex = push_node(newState, SAN_PARSER_BLOCK);
   parser_state_t s1;
   int oldIndentSenst = newState->indentSensitive;
   int result = SAN_NO_MATCH;
@@ -405,7 +406,7 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
       add_child(&s2, nodeIndex);
 
       if (parse_terminal(&s2, &s3, SAN_TOKEN_EQUALS) != SAN_NO_MATCH) {
-        if (parse_func_body(&s3, &s4) != SAN_NO_MATCH) {
+        if (parse_block(&s3, &s4) != SAN_NO_MATCH) {
           add_child(&s4, nodeIndex);
           *newState = s4;
           return SAN_MATCH;
@@ -439,6 +440,41 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
   return SAN_NO_MATCH;
 }
 
+/*
+ * if_exp = 'if' exp 'then' exp
+ *        | 'if' exp block
+ *        ;
+ */
+int parse_if_exp(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing if expression\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_IF_EXPRESSION);
+  parser_state_t s1, s2, s3, s4;
+  if (parse_keyword(newState, &s1, SAN_KEYWORD_IF) != SAN_NO_MATCH) {
+    if (parse_exp(&s1, &s2) != SAN_NO_MATCH) {
+      add_child(&s2, nodeIndex);
+      if (parse_keyword(&s2, &s3, SAN_KEYWORD_THEN) != SAN_NO_MATCH) {
+        if (parse_exp(&s3, &s4) != SAN_NO_MATCH) {
+          add_child(&s4, nodeIndex);
+          *newState = s4;
+          return SAN_MATCH;
+        }
+      } else if(parse_block(&s2, &s3) != SAN_NO_MATCH) {
+        add_child(&s3, nodeIndex);
+        *newState = s3;
+        return SAN_MATCH;
+      } else {
+        parseError(state, &s2, SAN_ERROR_EXPECTED_BLOCK, "if");
+        return SAN_ERR_MATCH;
+      }
+    } else {
+      parseError0(state, &s1, SAN_ERROR_EXPECTED_EXPRESSION);
+      return SAN_ERR_MATCH;
+    }
+  }
+  return SAN_NO_MATCH;
+}
+
 int parse_exp(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing expression\n");
   *newState = clone_state(state);
@@ -446,6 +482,7 @@ int parse_exp(parser_state_t const *state, parser_state_t *newState) {
   parser_state_t s1;
 
   if ((parse_variable_exp(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_if_exp(newState, &s1) != SAN_NO_MATCH) ||
       (parse_additive_exp(newState, &s1) != SAN_NO_MATCH)) {
     add_child(&s1, nodeIndex);
     *newState = s1;

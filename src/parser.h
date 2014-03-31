@@ -19,10 +19,13 @@
 #define SAN_PARSER_FUNCTION_LVALUE            9
 #define SAN_PARSER_FUNCTION_PARAMETER_LIST    10
 #define SAN_PARSER_FUNCTION_PARAMETER         11
-#define SAN_PARSER_FUNCTION_BODY              12
+#define SAN_PARSER_BLOCK                      12
 #define SAN_PARSER_PRIMARY_EXPRESSION         13
+#define SAN_PARSER_IF_EXPRESSION              14
 
 #define SAN_KEYWORD_LET                       "let"
+#define SAN_KEYWORD_IF                        "if"
+#define SAN_KEYWORD_THEN                      "then"
 
 typedef struct {
   int type;

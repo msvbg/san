@@ -106,7 +106,7 @@ START_TEST (test_function_indentation) {
 
   BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = let x y =\n\n y")
     expect_exists(
-      SAN_PARSER_FUNCTION_BODY
+      SAN_PARSER_BLOCK
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
     expect_no_errors
   END_WALK_TREE
@@ -119,8 +119,27 @@ START_TEST (test_function_indentation) {
     "     y\n"
     "    let z = 5")
     expect_exists(
-      SAN_PARSER_FUNCTION_BODY
+      SAN_PARSER_BLOCK
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
+    expect_no_errors
+  END_WALK_TREE
+
+} END_TEST
+
+START_TEST (test_if_expression) {
+
+  BEGIN_WALK_TREE("if x then y")
+    expect_exists(
+      SAN_PARSER_EXPRESSION
+      , with_parent SAN_PARSER_IF_EXPRESSION)
+    expect_no_errors
+  END_WALK_TREE
+
+  BEGIN_WALK_TREE("if x\n"
+                  "  y")
+    expect_exists(
+      SAN_PARSER_EXPRESSION
+      , with_parent SAN_PARSER_IF_EXPRESSION)
     expect_no_errors
   END_WALK_TREE
 
@@ -133,6 +152,7 @@ Suite* parser_suite(void) {
   tcase_add_test(tc_core, test_empty_input);
   tcase_add_test(tc_core, test_function_definition);
   tcase_add_test(tc_core, test_function_indentation);
+  tcase_add_test(tc_core, test_if_expression);
   suite_add_tcase(s, tc_core);
 
   return s;

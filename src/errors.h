@@ -51,6 +51,10 @@ typedef struct {
 #define SAN_ERROR_BAD_INDENTATION_MSG \
   "Indentation error"
 
+#define SAN_ERROR_EXPECTED_BLOCK               1010
+#define SAN_ERROR_EXPECTED_BLOCK_MSG \
+  "In '%s', expected a block after '%s'"
+
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
 
