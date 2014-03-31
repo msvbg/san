@@ -24,7 +24,7 @@ START_TEST (test_vector_push_back) {
   sanv_push(&t, val);
   ck_assert_int_eq(t.size, 1);
   ck_assert_int_eq(*(int*)sanv_back(&t), 5);
-  
+
   *val = 9;
   sanv_push(&t, val);
   ck_assert_int_eq(t.size, 2);
@@ -45,12 +45,22 @@ START_TEST (test_vector_push_back) {
   free(val);
 } END_TEST
 
+START_TEST (test_vector_push_int) {
+  san_vector_t t;
+  sanv_create(&t, sizeof(int));
+  sanv_push_int(&t, 5);
+  ck_assert_int_eq(t.size, 1);
+  ck_assert_int_eq(sanv_back_int(&t), 5);
+  sanv_destroy(&t, int_destructor);
+} END_TEST
+
 Suite* vector_suite(void) {
   Suite *s = suite_create("Vector");
 
   TCase *tc_core = tcase_create("Core");
   tcase_add_test(tc_core, test_empty_vector);
   tcase_add_test(tc_core, test_vector_push_back);
+  tcase_add_test(tc_core, test_vector_push_int);
   suite_add_tcase(s, tc_core);
 
   return s;

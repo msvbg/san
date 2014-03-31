@@ -26,6 +26,10 @@ inline void *sanv_back(san_vector_t const *vector) {
   return vector->size > 0 ? sanv_nth(vector, vector->size - 1) : NULL;
 }
 
+inline int sanv_back_int(san_vector_t const *vector) {
+  return *(int*)sanv_back(vector);
+}
+
 int sanv_push(san_vector_t *vector, void *value) {
   void *back;
 
@@ -44,6 +48,10 @@ int sanv_push(san_vector_t *vector, void *value) {
   vector->size += 1;
 
   return SAN_OK;
+}
+
+inline int sanv_push_int(san_vector_t *vector, int value) {
+  return sanv_push(vector, &value);
 }
 
 int sanv_pop(san_vector_t *vector, void *value) {

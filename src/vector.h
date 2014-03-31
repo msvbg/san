@@ -13,7 +13,9 @@ int sanv_create(san_vector_t *vector, size_t elementSize);
 int sanv_destroy(san_vector_t *vector, int (*destructor)(void *));
 void *sanv_nth(san_vector_t const *vector, int n);
 void *sanv_back(san_vector_t const *vector);
+int sanv_back_int(san_vector_t const *vector);
 int sanv_push(san_vector_t *vector, void *value);
+int sanv_push_int(san_vector_t *vector, int value);
 int sanv_pop(san_vector_t *vector, void *value);
 
 #define SAN_VECTOR_FOR_EACH(__vector, __index, __type, __elem) \
