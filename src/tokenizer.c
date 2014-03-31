@@ -246,11 +246,12 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
         readIdentifierOrKeyword(state);
         break;
       case SAN_TOKEN_WHITE_SPACE:
-        if (state->hasReadLineNonSpace)
-          readWhiteSpace(state);
-        else {
+        if (!state->hasReadLineNonSpace && *state->inputPtr == ' ') {
           thisToken->type = SAN_TOKEN_INDENTATION;
           readIndentation(state);
+        }
+        else {
+          readWhiteSpace(state);
         }
         break;
       case SAN_TOKEN_NUMBER:

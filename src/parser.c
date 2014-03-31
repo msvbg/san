@@ -7,6 +7,7 @@ typedef struct {
   san_vector_t nodeStack;
 
   san_vector_t *errors;
+  san_vector_t indentStack;
   int indentSensitive;
 } parser_state_t;
 
@@ -48,7 +49,7 @@ int parse_additive_exp(parser_state_t const *state, parser_state_t *newState);
  * Parser helper functions
  */
 static inline int head_is(parser_state_t const *state, int tokenType) {
-  return state->tokenPtr->type == tokenType;
+    return state->tokenPtr->type == tokenType;
 }
 
 static inline parser_state_t consume_white_space(parser_state_t const *state) {
@@ -62,6 +63,7 @@ static inline parser_state_t consume_white_space(parser_state_t const *state) {
 static inline parser_state_t create_state() {
   parser_state_t state;
   sanv_create(&state.nodeStack, sizeof(san_node_t));
+  sanv_create(&state.indentStack, sizeof(int));
   return state;
 }
 
@@ -155,6 +157,33 @@ static inline parser_state_t clone_state(parser_state_t const *state) {
 }
 
 /*
+ * Indentation
+ */
+static inline int indent_depth(parser_state_t *state) {
+  return state->indentStack.size > 0 ? sanv_back_int(&state->indentStack) : 0;
+}
+
+static int push_indent(parser_state_t *state) {
+  int depth = 0;
+  parser_state_t s1 = consume_white_space(state);
+  if (head_is(&s1, SAN_TOKEN_INDENTATION)) {
+    depth = strlen(s1.tokenPtr->raw);
+    if (indent_depth(&s1) >= depth) {
+      san_error_t err = _parseError(state, SAN_ERROR_BAD_INDENTATION);
+      sanv_push(state->errors, &err);
+      return 0;
+    }
+    sanv_push_int(&state->indentStack, depth);
+  }
+  return depth;
+}
+
+static inline void pop_indent(parser_state_t *state) {
+  int dump;
+  sanv_pop(&state->indentStack, &dump);
+}
+
+/*
  * Parser functions
  */
 
@@ -173,7 +202,6 @@ static inline int parse_keyword(
   parser_state_t *newState,
   const char* keyword
 ) {
-  san_dbg("KW() state: '%s'\n", state->tokenPtr->raw);
   *newState = consume_white_space(state);
   return strcmp(newState->tokenPtr->raw, keyword) == 0 &&
     parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) == SAN_MATCH
@@ -182,7 +210,6 @@ static inline int parse_keyword(
 
 int parse_number_literal(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing number literal\n");
-        fflush(stdout);
   *newState = clone_state(state);
   push_node(newState, SAN_PARSER_NUMBER_LITERAL);
   parser_state_t s1;
@@ -212,7 +239,6 @@ int parse_primary_exp(parser_state_t const *state, parser_state_t *newState) {
 
 int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing mult exp\n");
-  fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_MULTIPLICATIVE_EXPRESSION);
 
@@ -238,7 +264,6 @@ int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
 
 int parse_additive_exp(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing additive exp\n");
-  fflush(stdout);
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_ADDITIVE_EXPRESSION);
 
@@ -309,6 +334,8 @@ static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_LVALUE);
   parser_state_t s1;
+  int result = SAN_NO_MATCH;
+  int oldIndentSenst = newState->indentSensitive;
 
   newState->indentSensitive = 0;
 
@@ -316,11 +343,12 @@ static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
     if (parse_func_param_list(newState, &s1) != SAN_NO_MATCH) {
       add_child(&s1, nodeIndex);
       *newState = s1;
-      return SAN_MATCH;
+      result = SAN_MATCH;
     }
   }
 
-  return SAN_NO_MATCH;
+  newState->indentSensitive = oldIndentSenst;
+  return result;
 }
 
 static int parse_func_body(parser_state_t *state, parser_state_t *newState) {
@@ -328,27 +356,35 @@ static int parse_func_body(parser_state_t *state, parser_state_t *newState) {
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_FUNCTION_BODY);
   parser_state_t s1;
+  int oldIndentSenst = newState->indentSensitive;
+  int result = SAN_NO_MATCH;
 
   newState->indentSensitive = 1;
 
   if (parse_exp(newState, &s1) != SAN_NO_MATCH) {
     add_child(&s1, nodeIndex);
     *newState = s1;
-    return SAN_MATCH;
+    result = SAN_MATCH;
+    goto out;
   } else {
     int foundBlock = 0;
-    while (parse_terminal(newState, newState, SAN_TOKEN_INDENTATION) != SAN_NO_MATCH) {
+    int depth = push_indent(newState);
+    while (parse_terminal(newState, newState, SAN_TOKEN_INDENTATION) != SAN_NO_MATCH && indent_depth(newState) == depth) {
       foundBlock = 1;
       if (parse_exp(newState, newState) != SAN_NO_MATCH) {
         add_child(newState, nodeIndex);
       }
     }
+    pop_indent(newState);
     if (foundBlock) {
-      return SAN_MATCH;
+      result = SAN_MATCH;
+      goto out;
     }
   }
 
-  return SAN_NO_MATCH;
+out:
+  newState->indentSensitive = oldIndentSenst;
+  return result;
 }
 
 int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {

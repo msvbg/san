@@ -35,7 +35,7 @@ int noop_destructor(void *ptr) {return SAN_OK;}
 #define expect_no_errors do { \
   if (errorList.size > 0) { \
     SAN_VECTOR_FOR_EACH(errorList, i, san_error_t, error) \
-      printf("Error %d: %s\n", i+1, error->msg); \
+      printf("[%d:%d] Error %d: %s\n", error->line, error->column, i+1, error->msg); \
     SAN_VECTOR_END_FOR_EACH \
   } \
   ck_assert_int_eq(errorList.size, 0); \
@@ -83,7 +83,7 @@ START_TEST (test_empty_input) {
 
 START_TEST (test_function_definition) {
 
-  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = n + 1")
+  BEGIN_WALK_TREE("let somefunc param1 param2 = n + 1")
     expect_exists(
       SAN_PARSER_FUNCTION_LVALUE
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
@@ -100,7 +100,18 @@ START_TEST (test_function_definition) {
     expect_no_errors
   END_WALK_TREE
 
-  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = let x y = y")
+} END_TEST
+
+START_TEST (test_function_indentation) {
+
+  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 = let x y =\n\n y")
+    expect_exists(
+      SAN_PARSER_FUNCTION_BODY
+      , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
+    expect_no_errors
+  END_WALK_TREE
+
+  BEGIN_WALK_TREE("let\n somefunc\n param1 param2 =\n let x y =\n  y")
     expect_exists(
       SAN_PARSER_FUNCTION_BODY
       , with_parent SAN_PARSER_VARIABLE_EXPRESSION)
@@ -115,6 +126,7 @@ Suite* parser_suite(void) {
   TCase *tc_core = tcase_create("Core");
   tcase_add_test(tc_core, test_empty_input);
   tcase_add_test(tc_core, test_function_definition);
+  tcase_add_test(tc_core, test_function_indentation);
   suite_add_tcase(s, tc_core);
 
   return s;

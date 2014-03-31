@@ -47,6 +47,10 @@ typedef struct {
 #define SAN_ERROR_EXPECTED_FUNCTION_BODY_MSG \
   "Expected a function body after '=' in '%s'"
 
+#define SAN_ERROR_BAD_INDENTATION              1009
+#define SAN_ERROR_BAD_INDENTATION_MSG \
+  "Indentation error at '%s'."
+
 int sane_create(san_error_t **error);
 int sane_destructor(void *ptr);
 
