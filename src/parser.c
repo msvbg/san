@@ -248,17 +248,18 @@ int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_MULTIPLICATIVE_EXPRESSION);
 
-  parser_state_t s1, s2, s3;
+  parser_state_t s1, s2;
   if (parse_primary_exp(newState, &s1) != SAN_NO_MATCH) {
     add_child(&s1, nodeIndex);
     *newState = s1;
+
+    s2 = clone_state(&s1);
     if (parse_terminal(&s1, &s2, SAN_TOKEN_TIMES) != SAN_NO_MATCH) {
-      if (parse_primary_exp(&s2, &s3) != SAN_NO_MATCH) {
-        add_child(&s3, nodeIndex);
-        *newState = s3;
-        return SAN_MATCH;
+      if (parse_primary_exp(&s2, &s2) != SAN_NO_MATCH) {
+        add_child(&s2, nodeIndex);
+        *newState = s2;
       } else {
-        // Expected expression
+        parseError0(newState, &s2, SAN_ERROR_EXPECTED_FACTOR);
         return SAN_ERR_MATCH;
       }
     }

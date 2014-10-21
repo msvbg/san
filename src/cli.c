@@ -3,9 +3,17 @@
 #include "errors.h"
 #include "tokenizer.h"
 #include "parser.h"
+#include "bytecodegen.h"
 
-void print_error(san_error_t const *error) {
-  const char *file = "CLI";
+void print_help() {
+  printf("san version %d.%d.%d\n\n",
+    SAN_VERSION_MAJOR,
+    SAN_VERSION_MINOR,
+    SAN_VERSION_PATCH);
+  printf("Usage: san [ --repl | source.san ]\n");
+}
+
+void print_error(const char *file, const char *source, san_error_t const *error) {
   if (error->file != NULL)
     file = error->file;
 
@@ -15,9 +23,38 @@ void print_error(san_error_t const *error) {
     "\x1B[1;37m %s\n\x1B[0m",
     file, error->line, error->column,
     error->code, error->msg);
+
+  /* Print line with error */
+  int lineNo = 0;
+  const char *newLine = "\n", *eof = "\0";
+  for (const char *sourcePtr = source; *sourcePtr != '\0'; ++sourcePtr) {
+    if (sourcePtr == source || *(sourcePtr-1) == '\n') {
+      ++lineNo;
+      const char *lineEnd = strstr(sourcePtr, newLine);
+      if (lineEnd == NULL) {
+        lineEnd = strstr(sourcePtr, eof);
+      }
+      int len = (lineEnd - sourcePtr);
+      if (lineNo == error->line || lineNo == error->line - 1 || lineNo == error->line + 1) {
+        char *sourceLine = (char*)malloc(sizeof(char) * len + 1);
+        strncpy(sourceLine, sourcePtr, len);
+        sourceLine[len] = 0;
+        printf("\x1B[1;34m%04d\x1B[0m  %s\n", lineNo, sourceLine);
+        free(sourceLine);
+      }
+      if (lineNo == error->line) {
+        char *caretLine = (char*)malloc(sizeof(char) * len*2 + 12);
+        memset(caretLine, '~', len*2 + 12);
+        caretLine[len*2+12] = 0;
+        strncpy(&caretLine[error->column], "\x1B[1;37m^\x1B[0m", 12);
+        printf("     %s\n", caretLine);
+        free(caretLine);
+      }
+    }
+  }
 }
 
-int main(int argc, const char **argv) {
+void start_repl() {
   static const int MAX_LINE_LEN = 1024;
   int isReadingMultiline = 0;
   san_vector_t input;
@@ -60,11 +97,6 @@ int main(int argc, const char **argv) {
     }
 
     if (sant_tokenize(inputString, &tokens, &errList) == SAN_OK) {
-      if (errList.size != 0) {
-        SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
-          print_error(error);
-        SAN_VECTOR_END_FOR_EACH
-      }
     }
 
     san_node_t root;
@@ -76,10 +108,14 @@ int main(int argc, const char **argv) {
       isReadingMultiline = 1;
     } else if (errList.size != 0) {
       SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
-        print_error(error);
+        print_error("CLI", inputString, error);
       SAN_VECTOR_END_FOR_EACH
       printf("ERRORS: %d\n", errList.size);
     }
+
+    san_vector_t bytecodes;
+    sanv_create(&bytecodes, sizeof(san_bytecode_t));
+    sanb_generate(&root, &bytecodes, &errList);
 
     sanv_destroy(&tokens, &sant_destructor);
     sanv_destroy(&errList, &sane_destructor);
@@ -87,6 +123,60 @@ int main(int argc, const char **argv) {
   }
 
   sanv_destroy(&input, sanv_nodestructor);
+}
+
+void run_file(const char *file) {
+  FILE *fp;
+  long fsize;
+  char *input;
+  san_vector_t tokens, errList;
+  san_node_t root;
+
+  fp = fopen(file, "r");
+  if (fp == NULL) {
+    printf("Unable to read file %s.\n", file);
+    exit(1);
+  }
+
+  fseek(fp, 0, SEEK_END);
+  fsize = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+
+  input = malloc(fsize + 1);
+  fread(input, fsize, 1, fp);
+  fclose(fp);
+
+  input[fsize] = 0;
+
+  sanv_create(&tokens, sizeof(san_token_t));
+  sanv_create(&errList, sizeof(san_error_t));
+
+  if (sant_tokenize(input, &tokens, &errList) == SAN_OK) {
+  }
+
+  sanp_parse(&tokens, &root, &errList);
+
+  if (errList.size != 0) {
+    SAN_VECTOR_FOR_EACH(errList, i, san_error_t, error)
+      print_error(file, input, error);
+    SAN_VECTOR_END_FOR_EACH
+    printf("ERRORS: %d\n", errList.size);
+  }
+
+  sanv_destroy(&tokens, sant_destructor);
+  sanv_destroy(&errList, sane_destructor);
+}
+
+int main(int argc, const char **argv) {
+  if (argc == 1) {
+    print_help();
+  } else if (argc == 2) {
+    if (strcmp(argv[1], "--repl") == 0) {
+      start_repl();
+    } else {
+      run_file(argv[1]);
+    }
+  }
 
   return 0;
 }

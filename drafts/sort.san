@@ -1,4 +1,4 @@
-fn sort list:List*
+let sort list
   list.length.times j ->
     each [1 .. list.length-j] i ->
       if list[i-1] > list[i]

@@ -3,7 +3,8 @@
 
 Suite *(tokenizer_suite)(void),
       *(parser_suite)(void),
-      *(vector_suite)(void);
+      *(vector_suite)(void),
+      *(bytecodegen_suite)(void);
 
 void runSuite(Suite* (*suiteFn)(void), int *numFailed) {
   Suite *s = suiteFn();
@@ -19,6 +20,7 @@ int main(void) {
     &tokenizer_suite,
     &parser_suite,
     &vector_suite,
+    &bytecodegen_suite,
     0
   };
 

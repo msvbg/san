@@ -109,21 +109,6 @@ int reset_token(san_token_t *token) {
   return SAN_OK;
 }
 
-/*
-static int create_tokens(san_token_t **out, unsigned int n) {
-  int i;
-  san_token_t *tokens = calloc(n, sizeof(san_token_t));
-
-  if (tokens == NULL) return SAN_FAIL;
-  for (i = 0; i < n; ++i) reset_token(tokens + i);
-  *out = tokens;
-  return SAN_OK;
-}
-static inline int create_token(san_token_t **out) {
-  return create_tokens(out, 1);
-}
-*/
-
 int destroyTokens(san_token_t *tokens, int n) {
   int i;
   if (tokens != NULL) {
