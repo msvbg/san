@@ -21,7 +21,7 @@ typedef struct {
 
 #define SAN_ERROR_INVALID_CHARACTER            1002
 #define SAN_ERROR_INVALID_CHARACTER_MSG \
-  "Encountered an invalid characteter ('%c')"
+  "Encountered an invalid character ('%c')"
 
 #define SAN_ERROR_EXPECTED_EXPRESSION          1003
 #define SAN_ERROR_EXPECTED_EXPRESSION_MSG \

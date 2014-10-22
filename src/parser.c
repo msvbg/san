@@ -71,6 +71,11 @@ static inline parser_state_t create_state() {
   return state;
 }
 
+static int at_end(parser_state_t const *state) {
+  parser_state_t noWhitespace = eat_wspace(state);
+  return noWhitespace.tokenPtr->type == SAN_TOKEN_END;
+}
+
 /*
  * rawTokens
  *
@@ -118,7 +123,7 @@ static int push_node(parser_state_t *state, int type) {
 
 //static void begin_indent(parser_state_t *state, int depth);
 
-char *fmt(int n){
+char *fmt(int n) {
   switch(n) {
   case 0: return "NULL"; break;
   case SAN_PARSER_ROOT: return "Root"; break;
@@ -135,6 +140,9 @@ char *fmt(int n){
   case SAN_PARSER_BLOCK: return "Block"; break;
   case SAN_PARSER_PRIMARY_EXPRESSION: return "Primary expression"; break;
   case SAN_PARSER_IF_EXPRESSION: return "If expression"; break;
+  case SAN_PARSER_FN_EXPRESSION: return "Function expression"; break;
+  case SAN_PARSER_LIST: return "List"; break;
+  case SAN_PARSER_PIPE_EXPRESSION: return "Pipe expression"; break;
   }
   return "ERR";
 }
@@ -194,8 +202,8 @@ static inline void pop_indent(parser_state_t *state) {
  */
 
 static int parse_terminal(parser_state_t const *state, parser_state_t *newState, int terminal) {
-  if (state->tokenPtr->type == SAN_TOKEN_END) return SAN_NO_MATCH;
   *newState = eat_wspace(state);
+  if (newState->tokenPtr->type == SAN_TOKEN_END) return SAN_NO_MATCH;
   if (head_is(newState, terminal)) {
     *newState = advance_state(newState);
     return SAN_MATCH;
@@ -219,6 +227,7 @@ int parse_number_literal(parser_state_t const *state, parser_state_t *newState) 
   *newState = clone_state(state);
   push_node(newState, SAN_PARSER_NUMBER_LITERAL);
   parser_state_t s1;
+
   if (parse_terminal(newState, &s1, SAN_TOKEN_NUMBER) != SAN_NO_MATCH) {
     *newState = s1;
     return SAN_MATCH;
@@ -479,15 +488,111 @@ int parse_if_exp(parser_state_t *state, parser_state_t *newState) {
   return SAN_NO_MATCH;
 }
 
+int parse_paren_list(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing paren list\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_LIST);
+  parser_state_t s1, s2, s3;
+
+  if (parse_terminal(newState, &s1, SAN_TOKEN_LPAREN) != SAN_NO_MATCH) {
+    if (parse_exp(&s1, &s2) != SAN_NO_MATCH) {
+      add_child(&s2, nodeIndex);
+      if (parse_terminal(&s2, &s3, SAN_TOKEN_RPAREN) != SAN_NO_MATCH) {
+        *newState = s3;
+        return SAN_MATCH;
+      }
+    }
+  }
+
+  return SAN_NO_MATCH;
+}
+
+int parse_list(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing list\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_LIST);
+  int result = SAN_NO_MATCH;
+  parser_state_t s1, s2, s3;
+
+  if (parse_terminal(newState, &s1, SAN_TOKEN_LPAREN) != SAN_NO_MATCH) {
+    if (parse_exp(&s1, &s2) != SAN_NO_MATCH) {
+      add_child(&s2, nodeIndex);
+      if (parse_terminal(&s2, &s3, SAN_TOKEN_RPAREN) != SAN_NO_MATCH) {
+        *newState = s3;
+        return SAN_MATCH;
+      }
+    }
+  } else {
+    while ((parse_additive_exp(newState, &s1) != SAN_NO_MATCH) ||
+           (parse_paren_list(newState, &s1) != SAN_NO_MATCH)) {
+      add_child(&s1, nodeIndex);
+      *newState = s1;
+      result = SAN_MATCH;
+    }
+  }
+
+  return result;
+}
+
+int parse_fn_exp(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing function expression\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_FN_EXPRESSION);
+  parser_state_t s1, s2;
+
+  if (parse_var_lvalue(newState, &s1) != SAN_NO_MATCH) {
+    add_child(&s1, nodeIndex);
+
+    if (parse_list(&s1, &s2) != SAN_NO_MATCH) {
+        add_child(&s2, nodeIndex);
+        *newState = s2;
+        return SAN_MATCH;
+    }
+  }
+
+  return SAN_NO_MATCH;
+}
+
+int parse_pipe_exp(parser_state_t *state, parser_state_t *newState) {
+  san_dbg("Parsing pipe expression\n");
+  *newState = clone_state(state);
+  int nodeIndex = push_node(newState, SAN_PARSER_PIPE_EXPRESSION);
+  parser_state_t s1, s2, s3;
+
+  if ((parse_fn_exp(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_list(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_additive_exp(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_exp(newState, &s1) != SAN_NO_MATCH)) {
+    add_child(&s1, nodeIndex);
+
+    while (parse_terminal(&s1, &s2, SAN_TOKEN_PIPE) != SAN_NO_MATCH) {
+      if ((parse_fn_exp(&s2, &s3) != SAN_NO_MATCH) ||
+          (parse_additive_exp(&s2, &s3) != SAN_NO_MATCH)) {
+        add_child(&s3, nodeIndex);
+        *newState = s3;
+        return SAN_MATCH;
+      }
+    }
+  }
+
+  return SAN_NO_MATCH;
+}
+
 int parse_exp(parser_state_t const *state, parser_state_t *newState) {
   san_dbg("Parsing expression\n");
   *newState = clone_state(state);
   int nodeIndex = push_node(newState, SAN_PARSER_EXPRESSION);
   parser_state_t s1;
 
+  if (at_end(state)) return SAN_NO_MATCH;
+
   if ((parse_variable_exp(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_pipe_exp(newState, &s1) != SAN_NO_MATCH) ||
       (parse_if_exp(newState, &s1) != SAN_NO_MATCH) ||
-      (parse_additive_exp(newState, &s1) != SAN_NO_MATCH)) {
+      (parse_fn_exp(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_list(newState, &s1) != SAN_NO_MATCH) ||
+      (parse_additive_exp(newState, &s1) != SAN_NO_MATCH)
+      ) {
     add_child(&s1, nodeIndex);
     *newState = s1;
     return SAN_MATCH;
@@ -497,7 +602,7 @@ int parse_exp(parser_state_t const *state, parser_state_t *newState) {
 }
 
 void indent(int n) {
-  for(int i = 0; i < n; ++i) san_dbg(" ");
+  for(int i = 0; i < n; ++i) san_dbg("| ");
 }
 
 void dump_ast(san_node_t *ast, int ind) {
@@ -506,7 +611,7 @@ void dump_ast(san_node_t *ast, int ind) {
   san_dbg("[node type: %s, ptr: '%s', nchildren: %d]\n", fmt(type), ast->token->raw, ast->children.size);
   fflush(stdout);
   SAN_VECTOR_FOR_EACH(ast->children, i, san_node_t, node)
-    dump_ast(node, ind+2);
+    dump_ast(node, ind+1);
   SAN_VECTOR_END_FOR_EACH
 }
 

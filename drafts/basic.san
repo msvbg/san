@@ -1,1 +1,1 @@
-let f = 5*
+let z = range 10 | map inc

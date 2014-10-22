@@ -1,7 +1,0 @@
-let sort list
-  list.length.times j ->
-    each [1 .. list.length-j] i ->
-      if list[i-1] > list[i]
-        swap(list[i-1], list[i])
-
-sort [5, 3, 3, 91, 2, 0, 7]

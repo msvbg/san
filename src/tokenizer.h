@@ -23,6 +23,10 @@ typedef struct {
 #define SAN_TOKEN_TIMES                   7
 #define SAN_TOKEN_PLUS                    8
 #define SAN_TOKEN_INDENTATION             9
+#define SAN_TOKEN_COMMENT                10
+#define SAN_TOKEN_PIPE                   11
+#define SAN_TOKEN_LPAREN                 12
+#define SAN_TOKEN_RPAREN                 13
 
 int sant_tokenize(const char *input, san_vector_t *tokens, san_vector_t *errors);
 int sant_destructor(void *ptr);

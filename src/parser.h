@@ -22,6 +22,9 @@
 #define SAN_PARSER_BLOCK                      12
 #define SAN_PARSER_PRIMARY_EXPRESSION         13
 #define SAN_PARSER_IF_EXPRESSION              14
+#define SAN_PARSER_FN_EXPRESSION              15
+#define SAN_PARSER_LIST                       16
+#define SAN_PARSER_PIPE_EXPRESSION            17
 
 #define SAN_KEYWORD_LET                       "let"
 #define SAN_KEYWORD_IF                        "if"

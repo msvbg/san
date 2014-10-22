@@ -49,6 +49,10 @@ static inline int is_white_space(char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
+static inline int is_newline(char c) {
+  return c == '\n';
+}
+
 /*
  * Tokenizer state
  */
@@ -91,6 +95,10 @@ int classify_token(const char *input) {
   if (firstChar == '=') return SAN_TOKEN_EQUALS;
   if (firstChar == '*') return SAN_TOKEN_TIMES;
   if (firstChar == '+') return SAN_TOKEN_PLUS;
+  if (firstChar == '#') return SAN_TOKEN_COMMENT;
+  if (firstChar == '|') return SAN_TOKEN_PIPE;
+  if (firstChar == '(') return SAN_TOKEN_LPAREN;
+  if (firstChar == ')') return SAN_TOKEN_RPAREN;
   return SAN_INVALID_TOKEN;
 }
 
@@ -189,7 +197,7 @@ int readWhiteSpace(tokenizer_state_t *state) {
 }
 
 int readNumber(tokenizer_state_t *state) {
-  while (*state->inputPtr != '\0')  {
+  while (*state->inputPtr != '\0') {
     if (is_digit(*state->inputPtr)) {
       if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
       advance(state);
@@ -198,6 +206,16 @@ int readNumber(tokenizer_state_t *state) {
       tokenError(state, SAN_ERROR_ADJACENT_NUMBER_ALPHA,
         *state->inputPtr, thisToken->raw);
       break;
+    } else break;
+  }
+  return SAN_OK;
+}
+
+int read_comment(tokenizer_state_t *state) {
+  while (*state->inputPtr != '\0') {
+    if (!is_newline(*state->inputPtr)) {
+      if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
+      advance(state);
     } else break;
   }
   return SAN_OK;
@@ -246,8 +264,15 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
       case SAN_TOKEN_TIMES:
       case SAN_TOKEN_PLUS:
       case SAN_TOKEN_EQUALS:
+      case SAN_TOKEN_PIPE:
+      case SAN_TOKEN_LPAREN:
+      case SAN_TOKEN_RPAREN:
         acceptChar(state);
         advance(state);
+        break;
+
+      case SAN_TOKEN_COMMENT:
+        read_comment(state);
         break;
 
       default:
