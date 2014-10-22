@@ -3,7 +3,8 @@
 #include "errors.h"
 #include "tokenizer.h"
 #include "parser.h"
-#include "bytecodegen.h"
+#include "bytecode.h"
+#include "vm.h"
 
 void print_help() {
   printf("san version %d.%d.%d\n\n",
@@ -113,9 +114,8 @@ void start_repl() {
       printf("ERRORS: %d\n", errList.size);
     }
 
-    san_vector_t bytecodes;
-    sanv_create(&bytecodes, sizeof(san_bytecode_t));
-    sanb_generate(&root, &bytecodes, &errList);
+    san_program_t program;
+    sanb_generate(&root, &program, &errList);
 
     sanv_destroy(&tokens, &sant_destructor);
     sanv_destroy(&errList, &sane_destructor);
@@ -162,6 +162,11 @@ void run_file(const char *file) {
     SAN_VECTOR_END_FOR_EACH
     printf("ERRORS: %d\n", errList.size);
   }
+
+  san_program_t program;
+  sanb_generate(&root, &program, &errList);
+
+  sanm_run(&program);
 
   sanv_destroy(&tokens, sant_destructor);
   sanv_destroy(&errList, sane_destructor);

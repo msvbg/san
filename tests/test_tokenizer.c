@@ -28,11 +28,11 @@ START_TEST (test_tokenize) {
 
   BEGIN_TOKENIZE("123 + 5")
     asrti(tokens.size, 6);
-    asrti(nth(0)->type, SAN_TOKEN_NUMBER);
+    asrti(nth(0)->type, SAN_TOKEN_NUMBER_LITERAL);
     asrti(nth(1)->type, SAN_TOKEN_WHITE_SPACE);
     asrti(nth(2)->type, SAN_TOKEN_PLUS);
     asrti(nth(3)->type, SAN_TOKEN_WHITE_SPACE);
-    asrti(nth(4)->type, SAN_TOKEN_NUMBER);
+    asrti(nth(4)->type, SAN_TOKEN_NUMBER_LITERAL);
     asrti(nth(5)->type, SAN_TOKEN_END);
     asrti(errList.size, 0);
   END_TOKENIZE

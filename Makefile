@@ -6,7 +6,7 @@ TEST_LDFLAGS=-L/usr/local/Cellar/check/0.9.10/lib -lcheck
 
 SAN_CC=cc $(SAN_CFLAGS)
 
-src_files=errors.c tokenizer.c parser.c vector.c bytecodegen.c
+src_files=errors.c tokenizer.c parser.c vector.c bytecode.c vm.c
 test_src_files=test_tokenizer.c test_parser.c test_vector.c	\
 	test_bytecodegen.c test_main.c
 

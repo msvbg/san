@@ -21,8 +21,8 @@ int sanv_pop_all(san_vector_t *vector);
 int sanv_nodestructor(void *ptr);
 
 #define SAN_VECTOR_FOR_EACH(__vector, __index, __type, __elem) \
-  for (int __index = 0; __index < __vector.size; ++__index) { \
-    __type* __elem = (__type*)sanv_nth(&__vector, __index);
+  for (int __index = 0; __index < (__vector).size; ++__index) { \
+    __type* __elem = (__type*)sanv_nth(&(__vector), __index);
 #define SAN_VECTOR_FOR_EACH2(__vector2, __index2, __type2, __elem2) \
   for (int __index2 = 0; __index2 < __vector2.size; ++__index2) { \
     __type2* __elem2 = (__type2*)sanv_nth(&__vector2, __index2);

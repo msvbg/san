@@ -91,7 +91,7 @@ int classify_token(const char *input) {
   const char firstChar = input[0];
   if (is_alphabetic(firstChar)) return SAN_TOKEN_IDENTIFIER_OR_KEYWORD;
   if (is_white_space(firstChar)) return SAN_TOKEN_WHITE_SPACE;
-  if (is_digit(firstChar)) return SAN_TOKEN_NUMBER;
+  if (is_digit(firstChar)) return SAN_TOKEN_NUMBER_LITERAL;
   if (firstChar == '=') return SAN_TOKEN_EQUALS;
   if (firstChar == '*') return SAN_TOKEN_TIMES;
   if (firstChar == '+') return SAN_TOKEN_PLUS;
@@ -99,6 +99,7 @@ int classify_token(const char *input) {
   if (firstChar == '|') return SAN_TOKEN_PIPE;
   if (firstChar == '(') return SAN_TOKEN_LPAREN;
   if (firstChar == ')') return SAN_TOKEN_RPAREN;
+  if (firstChar == '\'') return SAN_TOKEN_STRING_LITERAL;
   return SAN_INVALID_TOKEN;
 }
 
@@ -211,6 +212,25 @@ int readNumber(tokenizer_state_t *state) {
   return SAN_OK;
 }
 
+int read_string(tokenizer_state_t *state) {
+  int result = SAN_FAIL;
+
+  /* Accept apostrophe */
+  if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
+  advance(state);
+
+  while (*state->inputPtr != '\0') {
+    if (acceptChar(state) == SAN_FAIL) return SAN_FAIL;
+    if (*state->inputPtr == '\'') {
+      result = SAN_OK;
+      advance(state);
+      break;
+    }
+    advance(state);
+  }
+  return result;
+}
+
 int read_comment(tokenizer_state_t *state) {
   while (*state->inputPtr != '\0') {
     if (!is_newline(*state->inputPtr)) {
@@ -257,8 +277,12 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
           readWhiteSpace(state);
         }
         break;
-      case SAN_TOKEN_NUMBER:
+      case SAN_TOKEN_NUMBER_LITERAL:
         readNumber(state);
+        break;
+
+      case SAN_TOKEN_STRING_LITERAL:
+        read_string(state);
         break;
 
       case SAN_TOKEN_TIMES:
