@@ -57,7 +57,7 @@ static inline int is_newline(char c) {
  * Tokenizer state
  */
 static int create_state(tokenizer_state_t **state, san_vector_t *errorList) {
-  *state = calloc(1, sizeof(tokenizer_state_t));
+  *state = SAN_CALLOC(1, sizeof(tokenizer_state_t));
   if (state == NULL) return SAN_FAIL;
 
   (*state)->line = 1;
@@ -69,7 +69,7 @@ static int create_state(tokenizer_state_t **state, san_vector_t *errorList) {
 }
 
 static void destroy_state(tokenizer_state_t *state) {
-  free(state);
+  SAN_FREE(state);
 }
 
 void advance(tokenizer_state_t *state) {
@@ -110,9 +110,9 @@ int reset_token(san_token_t *token) {
   token->type = SAN_NO_TOKEN;
 
   if (token->raw != NULL)
-    free(token->raw);
+    SAN_FREE(token->raw);
 
-  token->raw = malloc(sizeof(char) * 32);
+  token->raw = SAN_MALLOC(sizeof(char) * 32);
   token->rawSize = 32;
   if (token->raw == NULL) return SAN_FAIL;
   return SAN_OK;
@@ -124,11 +124,11 @@ int destroyTokens(san_token_t *tokens, int n) {
     for (i = 0; i < n; ++i) {
       san_token_t *this = &tokens[i];
       if (this != NULL) {
-        free(this->raw);
+        SAN_FREE(this->raw);
         this = NULL;
       }
     }
-    free(tokens);
+    SAN_FREE(tokens);
     tokens = NULL;
   }
   return SAN_OK;
@@ -137,7 +137,7 @@ int destroyTokens(san_token_t *tokens, int n) {
 int sant_destructor(void *ptr) {
   san_token_t *token = (san_token_t*)ptr;
   if (token->raw != NULL && strcmp(token->raw, "") != 0) {
-    free(token->raw);
+    SAN_FREE(token->raw);
   }
   ptr = NULL;
   return SAN_OK;
@@ -260,7 +260,7 @@ int sant_tokenize(const char *input, san_vector_t *output, san_vector_t *errors)
     sanv_push(state->output, &newToken);
 
     thisToken = sanv_back(state->output);
-    thisToken->raw = calloc(32, sizeof(char));
+    thisToken->raw = SAN_CALLOC(32, sizeof(char));
     thisToken->rawSize = 32 * sizeof(char);
     thisToken->type = classify_token(state->inputPtr);
 

@@ -36,12 +36,23 @@
 #include <stdarg.h>
 
 #define SAN_DEBUG 1
+
 #if SAN_DEBUG == 1
 #define san_dbg(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+
+static void *san_dbg_allocptr;
+#define SAN_MALLOC(size) (san_dbg_allocptr = malloc(size)); do { san_dbg("MALLOC 0x%x, FILE: %s, LINE: %d\n", (int)san_dbg_allocptr, __FILE__, __LINE__); } while(0)
+#define SAN_CALLOC(n, size) (san_dbg_allocptr = calloc(n, size)); do { san_dbg("CALLOC 0x%x, FILE: %s, LINE: %d\n", (int)san_dbg_allocptr, __FILE__, __LINE__); } while(0)
+#define SAN_FREE(ptr) free(ptr); do { san_dbg("FREEING 0x%x, FILE: %s, LINE: %d\n", (int)ptr, __FILE__, __LINE__); } while(0)
+
 #else
+
 /* Avoid compiler warnings about unused arguments */
 void __san_noop(int k, ...);
 #define san_dbg(...) do { __san_noop(0, __VA_ARGS__); } while(0)
+
+#define SAN_FREE(ptr) free(ptr)
+
 #endif
 
 #endif

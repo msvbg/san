@@ -38,5 +38,6 @@ typedef struct {
 } san_node_t;
 
 int sanp_parse(san_vector_t const* tokens, san_node_t *ast, san_vector_t *errors);
+int sanp_destroy(san_node_t *ptr);
 
 #endif

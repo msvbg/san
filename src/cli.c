@@ -37,19 +37,19 @@ void print_error(const char *file, const char *source, san_error_t const *error)
       }
       int len = (lineEnd - sourcePtr);
       if (lineNo == error->line || lineNo == error->line - 1 || lineNo == error->line + 1) {
-        char *sourceLine = (char*)malloc(sizeof(char) * len + 1);
+        char *sourceLine = (char*)SAN_MALLOC(sizeof(char) * len + 1);
         strncpy(sourceLine, sourcePtr, len);
         sourceLine[len] = 0;
         printf("\x1B[1;34m%04d\x1B[0m  %s\n", lineNo, sourceLine);
-        free(sourceLine);
+        SAN_FREE(sourceLine);
       }
       if (lineNo == error->line) {
-        char *caretLine = (char*)malloc(sizeof(char) * len*2 + 12);
+        char *caretLine = (char*)SAN_MALLOC(sizeof(char) * len*2 + 12);
         memset(caretLine, '~', len*2 + 12);
         caretLine[len*2+12] = 0;
         strncpy(&caretLine[error->column], "\x1B[1;37m^\x1B[0m", 12);
         printf("     %s\n", caretLine);
-        free(caretLine);
+        SAN_FREE(caretLine);
       }
     }
   }
@@ -88,7 +88,7 @@ void start_repl() {
     san_vector_t errList;
     sanv_create(&errList, sizeof(san_error_t));
 
-    char *inputString = malloc(sizeof(char) * MAX_LINE_LEN * input.size);
+    char *inputString = SAN_MALLOC(sizeof(char) * MAX_LINE_LEN * input.size);
     char *inputPtr = inputString;
     for (int i = 0; i < input.size; ++i) {
       char *thisLine = (char*)sanv_nth(&input, i);
@@ -117,9 +117,13 @@ void start_repl() {
     san_program_t program;
     sanb_generate(&root, &program, &errList);
 
+    sanm_run(&program);
+
+    sanb_destroy(&program);
     sanv_destroy(&tokens, &sant_destructor);
     sanv_destroy(&errList, &sane_destructor);
-    free(inputString);
+    sanp_destroy(&root);
+    SAN_FREE(inputString);
   }
 
   sanv_destroy(&input, sanv_nodestructor);
@@ -142,7 +146,7 @@ void run_file(const char *file) {
   fsize = ftell(fp);
   fseek(fp, 0, SEEK_SET);
 
-  input = malloc(fsize + 1);
+  input = SAN_MALLOC(fsize + 1);
   fread(input, fsize, 1, fp);
   fclose(fp);
 
@@ -168,8 +172,11 @@ void run_file(const char *file) {
 
   sanm_run(&program);
 
+  sanb_destroy(&program);
   sanv_destroy(&tokens, sant_destructor);
   sanv_destroy(&errList, sane_destructor);
+  sanp_destroy(&root);
+  SAN_FREE(input);
 }
 
 int main(int argc, const char **argv) {

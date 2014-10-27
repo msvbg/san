@@ -45,6 +45,10 @@ static san_error_t _parseError(parser_state_t *state, int code) {
 int parse_exp(parser_state_t const *state, parser_state_t *newState);
 int parse_additive_exp(parser_state_t const *state, parser_state_t *newState);
 
+int sanp_destructor(void *ptr) {
+  return sanp_destroy((san_node_t*)ptr);
+}
+
 /*
  * Parser helper functions
  */
@@ -69,6 +73,12 @@ static inline parser_state_t create_state() {
   sanv_create(&state.nodeStack, sizeof(san_node_t));
   sanv_create(&state.indentStack, sizeof(int));
   return state;
+}
+
+static inline int destroy_state(parser_state_t *state) {
+    sanv_destroy(&state->nodeStack, sanp_destructor);
+    sanv_destroy(&state->indentStack, sanv_nodestructor);
+    return SAN_OK;
 }
 
 static int at_end(parser_state_t const *state) {
@@ -121,8 +131,6 @@ static int push_node(parser_state_t *state, int type) {
   return state->nodeStack.size - 1;
 }
 
-//static void begin_indent(parser_state_t *state, int depth);
-
 char *fmt(int n) {
   switch(n) {
   case 0: return "NULL"; break;
@@ -161,12 +169,36 @@ void add_child(parser_state_t *state, int nodeIndex) {
   //san_dbg("\n");
 }
 
+san_node_t clone_node(const san_node_t *node) {
+  san_node_t newNode;
+  newNode.type = node->type;
+  newNode.token = node->token;
+  sanv_create(&newNode.children, sizeof(san_node_t));
+  SAN_VECTOR_FOR_EACH(node->children, i, san_node_t, child)
+    san_node_t newChild = clone_node(child);
+    sanv_push(&newNode.children, &newChild);
+  SAN_VECTOR_END_FOR_EACH
+  return newNode;
+}
+
 static inline parser_state_t clone_state(parser_state_t const *state) {
-  parser_state_t newState = *state;
+  parser_state_t newState;
+  newState.tokens = state->tokens;
+  newState.tokenPtr = state->tokenPtr;
+  newState.errors = state->errors;
+  newState.indentSensitive = state->indentSensitive;
+
   sanv_create(&newState.nodeStack, sizeof(san_node_t));
   SAN_VECTOR_FOR_EACH(state->nodeStack, i, san_node_t, node)
-    sanv_push(&newState.nodeStack, node);
+    san_node_t child = clone_node(node);
+    sanv_push(&newState.nodeStack, &child);
   SAN_VECTOR_END_FOR_EACH
+
+  sanv_create(&newState.indentStack, sizeof(int));
+  SAN_VECTOR_FOR_EACH(state->indentStack, i, int, indent)
+    sanv_push_int(&newState.indentStack, *indent);
+  SAN_VECTOR_END_FOR_EACH
+
   return newState;
 }
 
@@ -207,8 +239,15 @@ static int parse_terminal(parser_state_t const *state, parser_state_t *newState,
   if (newState->tokenPtr->type == SAN_TOKEN_END) return SAN_NO_MATCH;
   if (head_is(newState, terminal)) {
     *newState = advance_state(newState);
-    return SAN_MATCH;
+    goto match;
   }
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -218,9 +257,20 @@ static inline int parse_keyword(
   const char* keyword
 ) {
   *newState = eat_wspace(state);
-  return strcmp(newState->tokenPtr->raw, keyword) == 0 &&
-    parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) == SAN_MATCH
-    ? SAN_MATCH : SAN_NO_MATCH;
+  if (strcmp(newState->tokenPtr->raw, keyword) == 0 &&
+    parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) == SAN_MATCH) {
+
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_number_literal(parser_state_t const *state, parser_state_t *newState) {
@@ -231,8 +281,15 @@ int parse_number_literal(parser_state_t const *state, parser_state_t *newState) 
 
   if (parse_terminal(newState, &s1, SAN_TOKEN_NUMBER_LITERAL) != SAN_NO_MATCH) {
     *newState = s1;
-    return SAN_MATCH;
+    goto match;
   }
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -244,8 +301,15 @@ int parse_string_literal(parser_state_t const *state, parser_state_t *newState) 
 
   if (parse_terminal(newState, &s1, SAN_TOKEN_STRING_LITERAL) != SAN_NO_MATCH) {
     *newState = s1;
-    return SAN_MATCH;
+    goto match;
   }
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -259,11 +323,18 @@ int parse_primary_exp(parser_state_t const *state, parser_state_t *newState) {
       parse_string_literal(newState, &s1) != SAN_NO_MATCH) {
     add_child(&s1, nodeIndex);
     *newState = s1;
-    return SAN_MATCH;
+    goto match;
   } else if (parse_terminal(newState, &s1, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) != SAN_NO_MATCH) {
     *newState = s1;
-    return SAN_MATCH;
+    goto match;
   }
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -284,12 +355,20 @@ int parse_mult_exp(parser_state_t const *state, parser_state_t *newState) {
         *newState = s2;
       } else {
         parseError0(newState, &s2, SAN_ERROR_EXPECTED_FACTOR);
-        return SAN_ERR_MATCH;
+        goto errmatch;
       }
     }
-    return SAN_MATCH;
+    goto match;
   }
 
+  goto nomatch;
+
+errmatch:
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -310,12 +389,20 @@ int parse_additive_exp(parser_state_t const *state, parser_state_t *newState) {
         *newState = s2;
       } else {
         parseError0(newState, &s2, SAN_ERROR_EXPECTED_TERM);
-        return SAN_ERR_MATCH;
+        goto errmatch;
       }
     }
-    return SAN_MATCH;
+    goto match;
   }
 
+  goto nomatch;
+
+errmatch:
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -325,9 +412,16 @@ int parse_func_param(parser_state_t *state, parser_state_t *newState) {
   push_node(newState, SAN_PARSER_FUNCTION_PARAMETER);
 
   if (parse_terminal(newState, newState, SAN_TOKEN_IDENTIFIER_OR_KEYWORD) != SAN_NO_MATCH) {
-    return SAN_MATCH;
+    goto match;
   }
 
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -344,7 +438,18 @@ int parse_func_param_list(parser_state_t *state, parser_state_t *newState) {
     result = SAN_MATCH;
   }
 
-  return result;
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_var_lvalue(parser_state_t *state, parser_state_t *newState) {
@@ -357,7 +462,18 @@ int parse_var_lvalue(parser_state_t *state, parser_state_t *newState) {
     result = SAN_MATCH;
   }
 
-  return result;
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
@@ -379,7 +495,19 @@ static int parse_func_lvalue(parser_state_t *state, parser_state_t *newState) {
   }
 
   newState->indentSensitive = oldIndentSenst;
-  return result;
+
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 static int parse_block(parser_state_t const *state, parser_state_t *newState) {
@@ -418,7 +546,19 @@ static int parse_block(parser_state_t const *state, parser_state_t *newState) {
 
 out:
   newState->indentSensitive = oldIndentSenst;
-  return result;
+
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
@@ -434,13 +574,13 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
         if (parse_block(&s3, &s4) != SAN_NO_MATCH) {
           add_child(&s4, nodeIndex);
           *newState = s4;
-          return SAN_MATCH;
+          goto match;
         } else {
           parseError0(newState, &s3, SAN_ERROR_EXPECTED_BLOCK);
-          return SAN_ERR_MATCH;
+          goto errmatch;
         }
       } else {
-        return SAN_NO_MATCH;
+        goto nomatch;
       }
     } else if (parse_var_lvalue(&s1, &s2) != SAN_NO_MATCH) {
       add_child(&s2, nodeIndex);
@@ -452,19 +592,27 @@ int parse_variable_exp(parser_state_t *state, parser_state_t *newState) {
           add_child(&s4, nodeIndex);
           s4.indentSensitive = oldIndentSenst;
           *newState = s4;
-          return SAN_MATCH;
+          goto match;
         } else {
           parseError0(newState, &s3, SAN_ERROR_EXPECTED_EXPRESSION);
-          return SAN_ERR_MATCH;
+          goto errmatch;
         }
       } else {
-        return SAN_NO_MATCH;
+        goto nomatch;
       }
     } else {
       parseError0(state, &s1, SAN_ERROR_EXPECTED_LVALUE);
-      return SAN_ERR_MATCH;
+      goto errmatch;
     }
   }
+  goto nomatch;
+
+errmatch:
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -485,21 +633,29 @@ int parse_if_exp(parser_state_t *state, parser_state_t *newState) {
         if (parse_exp(&s3, &s4) != SAN_NO_MATCH) {
           add_child(&s4, nodeIndex);
           *newState = s4;
-          return SAN_MATCH;
+          goto match;
         }
       } else if(parse_block(&s2, &s3) != SAN_NO_MATCH) {
         add_child(&s3, nodeIndex);
         *newState = s3;
-        return SAN_MATCH;
+        goto match;
       } else {
         parseError0(state, &s2, SAN_ERROR_EXPECTED_BLOCK);
-        return SAN_ERR_MATCH;
+        goto errmatch;
       }
     } else {
       parseError0(state, &s1, SAN_ERROR_EXPECTED_EXPRESSION);
-      return SAN_ERR_MATCH;
+      goto errmatch;
     }
   }
+  goto nomatch;
+
+errmatch:
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -514,11 +670,18 @@ int parse_paren_list(parser_state_t *state, parser_state_t *newState) {
       add_child(&s2, nodeIndex);
       if (parse_terminal(&s2, &s3, SAN_TOKEN_RPAREN) != SAN_NO_MATCH) {
         *newState = s3;
-        return SAN_MATCH;
+        goto match;
       }
     }
   }
 
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -553,7 +716,18 @@ int parse_list(parser_state_t *state, parser_state_t *newState) {
     }
   }
 
-  return result;
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_fn_exp(parser_state_t *state, parser_state_t *newState) {
@@ -567,14 +741,26 @@ int parse_fn_exp(parser_state_t *state, parser_state_t *newState) {
     add_child(&s1, nodeIndex);
     result = SAN_MATCH;
 
-    while (parse_additive_exp(&s1, &s2) != SAN_NO_MATCH) {
+    while (parse_fn_exp(&s1, &s2) != SAN_NO_MATCH ||
+           parse_additive_exp(&s1, &s2) != SAN_NO_MATCH) {
         add_child(&s2, nodeIndex);
         s1 = s2;
         *newState = s2;
     }
   }
 
-  return result;
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_pipe_exp(parser_state_t *state, parser_state_t *newState) {
@@ -601,7 +787,18 @@ int parse_pipe_exp(parser_state_t *state, parser_state_t *newState) {
     }
   }
 
-  return result;
+  if (result == SAN_MATCH) {
+    goto match;
+  } else {
+    goto nomatch;
+  }
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
+  return SAN_NO_MATCH;
 }
 
 int parse_exp(parser_state_t const *state, parser_state_t *newState) {
@@ -610,7 +807,7 @@ int parse_exp(parser_state_t const *state, parser_state_t *newState) {
   int nodeIndex = push_node(newState, SAN_PARSER_EXPRESSION);
   parser_state_t s1;
 
-  if (at_end(state)) return SAN_NO_MATCH;
+  if (at_end(state)) goto nomatch;
 
   if ((parse_variable_exp(newState, &s1) != SAN_NO_MATCH) ||
       (parse_pipe_exp(newState, &s1) != SAN_NO_MATCH) ||
@@ -621,9 +818,16 @@ int parse_exp(parser_state_t const *state, parser_state_t *newState) {
       ) {
     add_child(&s1, nodeIndex);
     *newState = s1;
-    return SAN_MATCH;
+    goto match;
   }
 
+  goto nomatch;
+
+match:
+  return SAN_MATCH;
+
+nomatch:
+  destroy_state(newState);
   return SAN_NO_MATCH;
 }
 
@@ -665,6 +869,12 @@ int sanp_parse(san_vector_t const *tokens, san_node_t *ast, san_vector_t *errors
   *ast = *(san_node_t*)sanv_nth(&state.nodeStack, firstIndex);
 
   dump_ast(ast, 0);
+  destroy_state(&state);
 
+  return SAN_OK;
+}
+
+int sanp_destroy(san_node_t *ptr) {
+  sanv_destroy(&ptr->children, sanp_destructor);
   return SAN_OK;
 }

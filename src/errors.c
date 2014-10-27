@@ -4,7 +4,7 @@
 void __san_noop(int k, ...) {}
 
 int sane_create(san_error_t **error) {
-  *error = malloc(sizeof(san_error_t));
+  *error = SAN_MALLOC(sizeof(san_error_t));
   if (error == NULL) return SAN_FAIL;
   return SAN_OK;
 }

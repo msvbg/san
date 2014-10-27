@@ -6,7 +6,7 @@ typedef struct {
   san_vector_t *errors;
 } bcgen_state_t;
 
-san_arg_t NO_ARG = { -1, -1 };
+static const san_arg_t NO_ARG = { -1, -1 };
 
 static int generate(bcgen_state_t *state);
 /*
@@ -37,7 +37,24 @@ static int store_number_literal(bcgen_state_t *state, int number, int *ref) {
   }
 
   *ref = state->program->numbers.size - 1;
+  return SAN_OK;
+}
 
+static int store_string_literal(bcgen_state_t *state, const char *string, int *ref) {
+  if (sanv_push(&state->program->strings, &string) != SAN_OK) {
+    return SAN_FAIL;
+  }
+
+  *ref = state->program->strings.size - 1;
+  return SAN_OK;
+}
+
+static int store_symbol(bcgen_state_t *state, const char *symbol, int *ref) {
+  if (sanv_push(&state->program->symbols, &symbol) != SAN_OK) {
+    return SAN_FAIL;
+  }
+
+  *ref = state->program->symbols.size - 1;
   return SAN_OK;
 }
 
@@ -82,6 +99,25 @@ static int generate(bcgen_state_t *state) {
       emit1(state, SAN_BYTECODE_PUSH, &arg);
       break;
     }
+    case SAN_PARSER_STRING_LITERAL: {
+      const char *str = state->node->token->raw;
+      san_arg_t arg = { SAN_BYTECODE_TYPE_STRING_LITERAL, 0 };
+      store_string_literal(state, str, &arg.ref);
+      emit1(state, SAN_BYTECODE_PUSH, &arg);
+      break;
+    }
+    case SAN_PARSER_FN_EXPRESSION: {
+      gen_children(state);
+      emit0(state, SAN_BYTECODE_CALL);
+      break;
+    }
+    case SAN_PARSER_VARIABLE_LVALUE: {
+      const char *fname = state->node->token->raw;
+      san_arg_t arg = { SAN_BYTECODE_TYPE_IDENTIFIER, 0 };
+      store_symbol(state, fname, &arg.ref);
+      emit1(state, SAN_BYTECODE_PUSH, &arg);
+      break;
+    }
     default:
       return SAN_FAIL;
   }
@@ -95,6 +131,7 @@ const char *fmt_opcode(int opcode) {
   case SAN_BYTECODE_POP: return "pop";
   case SAN_BYTECODE_MUL: return "mul";
   case SAN_BYTECODE_ADD: return "add";
+  case SAN_BYTECODE_CALL: return "call";
   }
   return "ERROR";
 }
@@ -102,12 +139,22 @@ const char *fmt_opcode(int opcode) {
 void dump_program(san_program_t *program) {
   san_dbg("Number literals:\n");
   SAN_VECTOR_FOR_EACH(program->numbers, i, int, number)
-    printf("%d\n", *number);
+    san_dbg("%d:%d\n", i, *number);
+  SAN_VECTOR_END_FOR_EACH
+
+  san_dbg("\nString literals:\n");
+  SAN_VECTOR_FOR_EACH(program->strings, i, const char*, string)
+    san_dbg("%d:%s\n", i, *string);
+  SAN_VECTOR_END_FOR_EACH
+
+  san_dbg("\nSymbols:\n");
+  SAN_VECTOR_FOR_EACH(program->symbols, i, const char*, symbol)
+    san_dbg("%d:%s\n", i, *symbol);
   SAN_VECTOR_END_FOR_EACH
 
   san_dbg("\nOpcodes:\n");
   SAN_VECTOR_FOR_EACH(program->bytecode, i, san_bytecode_t, code)
-    printf("%s (%d, %d)\n", fmt_opcode(code->opcode), code->arg1.ref, code->arg2.ref);
+    san_dbg("%s (%d, %d)\n", fmt_opcode(code->opcode), code->arg1.ref, code->arg2.ref);
   SAN_VECTOR_END_FOR_EACH
 }
 
@@ -116,10 +163,17 @@ int sanb_generate(const san_node_t *ast, san_program_t *program, san_vector_t *e
 
   sanv_create(&program->bytecode, sizeof(san_bytecode_t));
   sanv_create(&program->numbers, sizeof(int));
+  sanv_create(&program->strings, sizeof(char*));
+  sanv_create(&program->symbols, sizeof(char*));
   generate(&state);
   //sanv_destroy(program->bytecode);
 
   dump_program(program);
 
+  return SAN_OK;
+}
+
+int sanb_destroy(san_program_t *program) {
+  sanv_destroy(&program->bytecode, sanv_nodestructor);
   return SAN_OK;
 }
