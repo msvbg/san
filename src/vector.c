@@ -2,8 +2,7 @@
 #include "vector.h"
 
 int sanv_create(san_vector_t *vector, size_t elementSize) {
-  memset(vector, 0, sizeof(san_vector_t));
-  vector->capacity = 8;
+  vector->capacity = 4;
   vector->elementSize = elementSize;
   vector->size = 0;
   vector->elems = SAN_CALLOC(vector->capacity, elementSize);
