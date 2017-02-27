@@ -1,10 +1,7 @@
 #include <stdlib.h>
 #include <check.h>
 
-Suite *(tokenizer_suite)(void),
-      *(parser_suite)(void),
-      *(vector_suite)(void),
-      *(bytecodegen_suite)(void);
+Suite *(pvector_suite)(void);
 
 void runSuite(Suite* (*suiteFn)(void), int *numFailed) {
   Suite *s = suiteFn();
@@ -17,14 +14,11 @@ void runSuite(Suite* (*suiteFn)(void), int *numFailed) {
 int main(void) {
   int numFailed, numTotalFailed = 0, i;
   Suite* (*suites[])(void) = {
-    &tokenizer_suite,
-    &parser_suite,
-    &vector_suite,
-    &bytecodegen_suite,
+    &pvector_suite,
     0
   };
 
-  for (i = 0; suites[i] != 0; ++i) {
+  for (i = 0;   suites[i] != 0; ++i) {
     runSuite(suites[i], &numFailed);
     numTotalFailed += numFailed;
   }

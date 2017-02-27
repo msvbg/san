@@ -1,0 +1,5 @@
+# san
+
+This is an old project I found in the depths of my harddrive, which I'm dumping here on Github for posterity. Looking through git history, it looks like I wrote most of it in March 2014. It's a programming language written in C. There's a tokenizer, a hand-written recursive-descent parser, a bytecode generator, a small VM, and even some attempts at unit testing! Pretty cool. I don't remember much of it, but I think I quit because it was leaking memory like hell and couldn't make heads or tails of valgrind.
+
+I'm never writing C again.
